@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Rummy</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.cutbtn{background:transparent;color:var(--gold);border:1px solid #7a5a1c;padding:8px 10px;font-size:13px}
+.cutbtn.on{background:var(--gold);color:#1b1b1b}
+.calcbtn{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:10px 12px;font-size:16px}
+.errs{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.errs .step button{width:34px;height:34px;font-size:18px}
+.errs .step .val{font-size:16px;min-width:22px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.cards button{background:#f3efe2;color:#14321f;border:0;padding:10px 4px;font-size:15px;font-weight:700;border-radius:10px}
+.cards button small{display:block;font-size:12px;font-weight:600;color:#3a5a42}
+.cards button.cm{background:#e8c35a}
+.list{font-size:13px;color:var(--muted);min-height:20px;margin-bottom:8px;word-break:break-word}
+.tp{font-size:14px;color:var(--muted)} .tp b{color:var(--gold);font-size:16px}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>♠️ Rummy</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const CUTS=[['primera',150,'En la primera vuelta'],['junto',100,'Todo junto'],['paulatino',50,'De a poco']];
+const ERR=75;
+const CARDS=[['A',15],['3 al 7',5],['8 a la K',10],['Joker',30,1],['2 (comodín)',5,1],['2 (comodín)',10,1],['2 (comodín)',15,1]];
+let E=null;
+const minBajar=s=>s>500?75:s>300?50:0;
+
+const G={
+  subtitle:S=>`A ${U.fmt(S.opts.target||1000)} puntos`,
+  key:'rummy_v1', title:'Rummy', minP:2, maxP:8,
+  options:[{id:'target',label:'Se juega a',type:'number',def:1000}],
+  rules:`
+    <li>Baraja francesa. Cada mano se anotan los <b>puntos bajados</b> por cada uno.</li>
+    <li>Valores: <b>As 15</b> · del <b>3 al 7: 5</b> · del <b>8 a la K: 10</b> · <b>Joker 30</b> · el <b>2 es comodín</b> y vale 5, 10 o 15 según dónde se ponga.</li>
+    <li>El que <b>corta</b> suma además: <b>150</b> si cortó en la primera vuelta, <b>100</b> si bajó todo junto después, <b>50</b> si fue bajando de a poco.</li>
+    <li>Si alguien <b>baja mal</b> o se equivoca, se le restan <b>75</b>.</li>
+    <li>Pasados los <b>300</b> puntos hay que bajar al menos <b>50</b>; pasados los <b>500</b>, al menos <b>75</b>.</li>
+    <li>Gana el primero que llega a <b>1.000</b>.</li>`,
+  newState(players){E=null;return {scores:Array(players.length).fill(0),hands:[]}},
+  result(S){
+    const max=Math.max(...S.scores), w=S.players.map((_,i)=>i).filter(i=>S.scores[i]===max);
+    return {winners:w,text:`${U.fmt(max)} puntos en ${S.hands.length} manos`};
+  },
+  endHtml(S){return `<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, fmt=U.fmt, n=S.players.length, T=S.opts.target||1000;
+    if(!E||E.hand!==S.hands.length)E={hand:S.hands.length,vals:Array(n).fill(''),errs:Array(n).fill(0),cutter:null,cut:null};
+    const cutPts=()=>E.cut?CUTS.find(c=>c[0]===E.cut)[1]:0;
+    const handPts=()=>S.players.map((_,p)=>(parseInt(E.vals[p],10)||0)+(E.cutter===p?cutPts():0)-ERR*E.errs[p]);
+    const max=Math.max(...S.scores), tied=S.players.filter((_,i)=>S.scores[i]===max).length>1;
+    let h='';
+    if(max>=T&&tied)h+=`<div class="banner">Empatados con ${fmt(max)}: se juega otra mano.</div>`;
+    h+=`<div class="card"><h2>Posiciones</h2>${U.rankHtml(S.players,S.scores,{
+      meta:p=>{const m=minBajar(S.scores[p]);return `${m?`para bajar: mínimo <b style="color:var(--text)">${m}</b>`:'sin mínimo para bajar'} · faltan ${fmt(Math.max(0,T-S.scores[p]))}`},
+      bar:p=>S.scores[p]/T*100})}</div>`;
+
+    h+=`<div class="card entry"><h2>Mano ${S.hands.length+1}</h2>
+      <div class="sub" style="margin:0">Cargá lo que bajó cada uno, marcá quién cortó y si alguien bajó mal.</div>`;
+    S.players.forEach((nm,p)=>{
+      const isCut=E.cutter===p;
+      h+=`<div class="er"><div class="row between"><span class="nm">${esc(nm)}</span>
+          <button class="cutbtn${isCut?' on':''}" data-cut="${p}">${isCut?'Cortó ✓':'Cortó'}</button></div>
+        ${isCut?`<div class="chips" style="margin-top:8px">${CUTS.map(c=>`<button class="chip${E.cut===c[0]?' sel':''}" data-ct="${c[0]}">${c[2]} +${c[1]}</button>`).join('')}</div>`:''}
+        <div class="row between" style="margin-top:8px">
+          <div class="errs">Bajó mal <div class="step"><button data-er="${p}" data-d="-1">−</button><div class="val">${E.errs[p]}</div><button data-er="${p}" data-d="1">+</button></div></div>
+          <div class="row" style="gap:6px"><button class="calcbtn" data-calc="${p}" aria-label="Calculadora">🧮</button>
+          <input type="number" inputmode="numeric" data-v="${p}" value="${E.vals[p]}" placeholder="0"></div>
+        </div>
+        <div class="tp" style="text-align:right;margin-top:6px" id="tp${p}"></div></div>`;
+    });
+    h+=`<div style="margin-top:12px"><button class="primary" id="add">Anotar mano</button></div>
+      <div class="sub" id="why" style="margin:8px 0 0"></div></div>`;
+    h+=`<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`;
+    $('game').innerHTML=h;
+
+    const upd=()=>{
+      const hp=handPts();
+      S.players.forEach((_,p)=>{
+        const bits=[];
+        if(E.cutter===p&&E.cut)bits.push(`corte +${cutPts()}`);
+        if(E.errs[p])bits.push(`−${ERR*E.errs[p]}`);
+        $('tp'+p).innerHTML=`Suma en la mano: <b>${hp[p]>0?'+':''}${fmt(hp[p])}</b>${bits.length?` <span>(${bits.join(', ')})</span>`:''}`;
+      });
+      const ok=E.cutter!==null&&E.cut!==null;
+      $('add').disabled=!ok;
+      $('why').textContent=E.cutter===null?'Falta marcar quién cortó.':E.cut===null?'Falta elegir cómo cortó.':'';
+    };
+    upd();
+    $('game').querySelectorAll('[data-cut]').forEach(b=>b.onclick=()=>{const p=+b.dataset.cut;E.cutter=E.cutter===p?null:p;E.cut=null;api.rerender()});
+    $('game').querySelectorAll('[data-ct]').forEach(b=>b.onclick=()=>{E.cut=b.dataset.ct;api.rerender()});
+    $('game').querySelectorAll('[data-er]').forEach(b=>b.onclick=()=>{const p=+b.dataset.er;E.errs[p]=Math.max(0,E.errs[p]+ +b.dataset.d);api.rerender()});
+    $('game').querySelectorAll('[data-v]').forEach(inp=>inp.oninput=()=>{E.vals[+inp.dataset.v]=inp.value.replace(/[^0-9]/g,'');upd()});
+    $('game').querySelectorAll('[data-calc]').forEach(b=>b.onclick=()=>calc(+b.dataset.calc,S,api));
+    $('add').onclick=()=>api.mutate(S=>{
+      const pts=handPts();
+      pts.forEach((v,p)=>S.scores[p]+=v);
+      S.hands.push({pts,cutter:E.cutter,cut:E.cut,errs:E.errs.slice()});
+      E=null;
+      const max=Math.max(...S.scores);
+      if(max>=T&&S.scores.filter(x=>x===max).length===1)S.over=true;
+    });
+  }
+};
+function calc(p,S,api){
+  const esc=U.esc; let list=[];
+  const draw=el=>{
+    const sum=list.reduce((a,c)=>a+c[1],0);
+    el.innerHTML=`<h3>Cartas bajadas</h3><div class="sub" style="margin:0">${esc(S.players[p])} · tocá cada carta que bajó</div>
+      <div class="cards">${CARDS.map((c,i)=>`<button class="${c[2]?'cm':''}" data-i="${i}">${c[0]}<small>${c[1]}</small></button>`).join('')}</div>
+      <div class="list">${list.length?list.map(c=>`${c[0].replace(' (comodín)','')} ${c[1]}`).join(' + '):'Sin cartas'}</div>
+      <div class="row between" style="margin-bottom:10px"><div style="font-size:26px;font-weight:800;color:var(--gold)">${sum}</div>
+        <button class="ghost small" id="cu" ${list.length?'':'disabled'}>↶ Quitar última</button></div>
+      <button class="primary" id="cok" ${sum?'':'disabled'} style="margin-bottom:8px">Sumar ${sum} a ${esc(S.players[p])}</button>
+      <button class="ghost" style="width:100%" id="cc">Cancelar</button>`;
+    el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{list.push(CARDS[+b.dataset.i]);draw(el)});
+    el.querySelector('#cu').onclick=()=>{list.pop();draw(el)};
+    el.querySelector('#cc').onclick=api.close;
+    el.querySelector('#cok').onclick=()=>{E.vals[p]=String((parseInt(E.vals[p],10)||0)+sum);api.close();api.rerender()};
+  };
+  api.sheet('',draw);
+}
+function planilla(S){
+  return U.sheetTable(S.players,S.hands,S.scores,{plus:true,
+    cellFmt:(v,r,j)=>(r.cutter===j?'✂ ':'')+(v>0?'+':'')+U.fmt(v),
+    cls:(v,r,j)=>r.cutter===j?'gold':v<0?'neg':'pos'});
+}
+U.app(G);
+</script>
+</body>
+</html>

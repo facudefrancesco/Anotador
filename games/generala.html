@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Generala</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<style>
+.backlink{display:inline-block;color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;padding:4px 0 6px}
+:root{
+  --bg:#0f2417; --card:#173822; --card2:#1d4429; --line:#2c5a39;
+  --text:#f3efe2; --muted:#b5c2b0; --gold:#e8c35a; --ok:#6fd38a; --bad:#ef7a6a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:14px 16px 40px;max-width:560px;margin:0 auto}
+h1{font-size:22px;margin:4px 0 2px;color:var(--gold)}
+h2{font-size:17px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+input[type=text]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}
+button{font:inherit;border:0;border-radius:12px;padding:13px 16px;font-size:16px;font-weight:600;cursor:pointer}
+.primary{background:var(--gold);color:#1b1b1b;width:100%}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.small{padding:8px 12px;font-size:14px}
+.danger{color:var(--bad);border-color:#6a3a33}
+.hidden{display:none!important}
+.namerow{display:flex;gap:8px;margin-bottom:8px}
+.namerow .ord{width:28px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tab{flex:1 1 22%;min-width:70px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 8px;text-align:center;color:var(--text)}
+.tab .nm{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tab .pt{font-size:26px;font-weight:800;line-height:1.1}
+.tab .pl{font-size:10px;color:var(--muted);font-weight:500}
+.tab.view{border-color:var(--gold)}
+.tab.turn .nm{color:var(--gold)}
+.tab.turn .nm::before{content:"🎲 "}
+
+.turnbar{background:var(--gold);color:#1b1b1b;border-radius:12px;padding:10px 14px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.turnbar.other{background:var(--card2);color:var(--muted);font-weight:500}
+.turnbar .srv{background:#1b1b1b;color:var(--gold);padding:7px 10px;font-size:13px;border-radius:10px}
+
+.status .line{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.status .line:last-child{border-bottom:0}
+.status .hd{display:flex;justify-content:space-between;font-weight:700;margin-bottom:3px}
+.status .hd .pts{color:var(--gold)}
+.ok{color:var(--ok)} .bad{color:var(--bad)} .mut{color:var(--muted)}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:var(--card2);color:var(--muted);font-weight:600}
+.pill.gold{background:var(--gold);color:#1b1b1b}
+.matchline{font-size:15px;padding:10px 12px;border-radius:10px;background:var(--card2);margin-bottom:6px}
+
+table{border-collapse:separate;border-spacing:5px;width:100%}
+th{font-size:14px;color:var(--muted);font-weight:600;padding:4px 0}
+th .mult{display:block;color:var(--gold);font-size:13px}
+td.cat{font-weight:700;font-size:17px;padding-left:4px;width:24%}
+td.cat small{display:block;color:var(--muted);font-weight:400;font-size:11px}
+td.cell{background:var(--card2);border:1px solid var(--line);border-radius:10px;height:52px;text-align:center;font-size:20px;font-weight:700;cursor:pointer}
+td.cell.empty{color:var(--line);font-weight:400}
+td.cell.x{color:var(--bad);font-size:16px}
+td.cell.lock{cursor:default}
+td.cell.lock .dot{opacity:.35}
+.riv{display:block;font-size:10px;font-weight:500;color:var(--muted);line-height:1.25;white-space:nowrap}
+.riv:first-of-type{margin-top:1px}
+.same{text-decoration:line-through;text-decoration-thickness:2px;opacity:.45}
+.rivtoggle{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0 4px 4px}
+.rivtoggle input{width:18px;height:18px}
+td.cell .tag{display:block;font-size:10px;font-weight:500;color:var(--muted);margin-top:-2px}
+td.cell .tag.d{color:var(--gold)}
+tr.sep td{height:4px}
+tr.foot td{text-align:center;font-size:12px;color:var(--muted);padding-top:6px}
+tr.foot td b{display:block;color:var(--gold);font-size:20px}
+
+.rules summary{font-weight:700;font-size:16px;cursor:pointer;list-style:none}
+.rules summary::-webkit-details-marker{display:none}
+.rules summary::after{content:" ▾";color:var(--muted)}
+.rules[open] summary::after{content:" ▴"}
+.rules ul{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.5;color:var(--muted)}
+.rules li{margin-bottom:4px}.rules b{color:var(--text)}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.hrow:last-child{border-bottom:0}
+.hrow .who{font-weight:600}.hrow .meta{font-size:12px;color:var(--muted)}
+.hrow .btns{display:flex;gap:6px;flex:none}
+.modes{display:flex;flex-direction:column;gap:8px}
+.mode{background:var(--card2);color:var(--text);border:1px solid var(--line);text-align:left;padding:12px 14px}
+.mode b{display:block;font-size:17px}.mode span{display:block;font-size:13px;color:var(--muted);font-weight:400;margin-top:2px}
+.mode.sel{border:2px solid var(--gold)}.mode.sel b{color:var(--gold)}
+.primary:disabled{opacity:.45}
+td.cell.next{border:2px solid var(--gold)}
+.rank .r{display:flex;justify-content:space-between;background:var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:6px}
+.rank .r.first{outline:2px solid var(--gold)}
+.footer{display:flex;gap:8px;margin-top:6px}
+.footer button{flex:1}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.sheet{background:var(--card);border-top:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:18px 16px 24px;max-height:90vh;overflow:auto}
+.sheet h3{margin:0 0 2px;font-size:19px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 10px}
+.opts button{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:14px 8px;font-size:16px}
+.opts button b{display:block;font-size:22px;color:var(--gold)}
+.opts button:disabled{opacity:.35}
+.opts .wide{grid-column:span 2}
+.dbl{background:#3a2a10;border:1px solid #7a5a1c;border-radius:12px;padding:12px;margin-bottom:10px}
+.dbl .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:42px;height:42px;padding:0;font-size:22px;background:var(--card2);color:var(--text);border:1px solid var(--line)}
+.step .val{min-width:34px;text-align:center;font-size:22px;font-weight:700}
+.xbtn{width:100%;background:transparent;color:var(--bad);border:1px solid #6a3a33;margin-bottom:8px}
+.win{text-align:center}
+.win .big{font-size:34px;font-weight:800;color:var(--gold);margin:8px 0}
+</style>
+</head>
+<body>
+<a class="backlink" href="../index.html">← Juegos</a>
+
+<h1>🎲 Generala</h1>
+<div class="sub" id="subtitle">Anotador</div>
+
+<section id="setup" class="hidden">
+  <div class="card">
+    <h2>Jugadores</h2>
+    <div class="sub" style="margin-bottom:10px">De 2 a 8 jugadores, en el orden en que tiran. Con hasta 3 jugadores se puede ver lo de los rivales en cada casilla.</div>
+    <div id="names"></div>
+    <button class="ghost small" id="addName">+ Agregar jugador</button>
+  </div>
+  <div class="card"><h2>¿A qué juegan?</h2><div id="modePick" class="modes"></div></div>
+  <button class="primary" id="startBtn" style="margin-bottom:14px">Empezar partida</button>
+  <div class="card hidden" id="histBox"><h2>Series anteriores</h2><div class="sub" style="margin-bottom:8px">Elegí una para seguir sumando partidas con los mismos jugadores.</div><div id="histList"></div></div>
+  <details class="card rules"><summary>📖 ¿Cómo se juega?</summary>
+    <ul>
+      <li>Cada jugador tiene 3 tiros por turno y anota lo que sacó en una casilla libre, en cualquier columna.</li>
+      <li><b>Números (1 al 6):</b> se anota la suma de los dados de ese número. Ej: tres 4 = 12 al 4.</li>
+      <li><b>Escalera</b> (1-5, 2-6 o 3-4-5-6-1): 20 barata, 25 servida.</li>
+      <li><b>Full</b> (3 iguales + 2 iguales): 30 barato, 35 servido.</li>
+      <li><b>Póker</b> (4 iguales): 40 barato, 45 servido.</li>
+      <li><b>Generala</b> (5 iguales): 50. <b>Servida gana la partida.</b></li>
+      <li><b>Doble</b>: 100, solo si ya tenés la generala anotada en esa misma columna.</li>
+      <li>Si no sacás nada, tachás (mongo) una casilla libre y ya no se puede usar.</li>
+      <li><b>Doblarse:</b> si sacás los 5 dados de un número seguís tirando hasta que no salga más. En Triplona se puede con las 3 generalas ocupadas (anotadas o tachadas), en Simple con la generala ocupada y en Obligada siempre.</li>
+      <li><b>Columnas:</b> el que más suma en la 1ª gana 1 punto, en la 2ª 2 y en la 3ª 3. Si empatan, no se la lleva nadie.</li>
+      <li>Gana la partida el que junta más puntos.</li>
+      <li><b>Modos:</b> <b>Triplona</b> (las 3 columnas), <b>Simple</b> (una columna, gana el que suma más) y <b>Obligada</b> (una columna, se anota en orden del 1 a la doble lo que salga).</li>
+    </ul></details>
+</section>
+
+<section id="game" class="hidden">
+  <div class="sub" id="seriesBar" style="margin:-6px 0 10px"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="card status" id="status"></div>
+  <div class="turnbar" id="turnbar"></div>
+  <div class="card" style="padding:10px 8px"><label class="rivtoggle"><input type="checkbox" id="rivChk"> Ver lo de los rivales en cada casilla</label><table id="grid"></table></div>
+  <div class="footer">
+    <button class="ghost small" id="undoBtn">↶ Deshacer</button>
+    <button class="ghost small danger" id="newBtn">Salir al menú</button>
+  </div>
+  <div style="margin-top:14px"><details class="card rules"><summary>📖 ¿Cómo se juega?</summary>
+    <ul>
+      <li>Cada jugador tiene 3 tiros por turno y anota lo que sacó en una casilla libre, en cualquier columna.</li>
+      <li><b>Números (1 al 6):</b> se anota la suma de los dados de ese número. Ej: tres 4 = 12 al 4.</li>
+      <li><b>Escalera</b> (1-5, 2-6 o 3-4-5-6-1): 20 barata, 25 servida.</li>
+      <li><b>Full</b> (3 iguales + 2 iguales): 30 barato, 35 servido.</li>
+      <li><b>Póker</b> (4 iguales): 40 barato, 45 servido.</li>
+      <li><b>Generala</b> (5 iguales): 50. <b>Servida gana la partida.</b></li>
+      <li><b>Doble</b>: 100, solo si ya tenés la generala anotada en esa misma columna.</li>
+      <li>Si no sacás nada, tachás (mongo) una casilla libre y ya no se puede usar.</li>
+      <li><b>Doblarse:</b> si sacás los 5 dados de un número seguís tirando hasta que no salga más. En Triplona se puede con las 3 generalas ocupadas (anotadas o tachadas), en Simple con la generala ocupada y en Obligada siempre.</li>
+      <li><b>Columnas:</b> el que más suma en la 1ª gana 1 punto, en la 2ª 2 y en la 3ª 3. Si empatan, no se la lleva nadie.</li>
+      <li>Gana la partida el que junta más puntos.</li>
+      <li><b>Modos:</b> <b>Triplona</b> (las 3 columnas), <b>Simple</b> (una columna, gana el que suma más) y <b>Obligada</b> (una columna, se anota en orden del 1 a la doble lo que salga).</li>
+    </ul></details></div>
+</section>
+
+<section id="end" class="hidden">
+  <div class="card win">
+    <div style="font-size:48px">🏆</div>
+    <div class="sub" style="margin:0">Ganó</div>
+    <div class="big" id="winnerName"></div>
+    <div class="sub" id="winnerPts"></div>
+  </div>
+  <div class="card"><h2>Columnas</h2><div class="rank" id="rank"></div></div>
+  <div class="card"><h2>Partidas acumuladas</h2><div class="rank" id="series"></div></div>
+  <div class="footer">
+    <button class="ghost small" id="seeBtn">Ver planillas</button>
+    <button class="primary small" id="againBtn">Seguir jugando</button>
+  </div>
+  <div class="footer"><button class="ghost small" id="undoEnd">↶ Deshacer</button><button class="ghost small danger" id="newEnd">Salir al menú</button></div>
+</section>
+
+<div class="overlay hidden" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const KEY='generala_v2';
+const CATS=[
+  {k:'1',n:'1',t:'num',f:1},{k:'2',n:'2',t:'num',f:2},{k:'3',n:'3',t:'num',f:3},
+  {k:'4',n:'4',t:'num',f:4},{k:'5',n:'5',t:'num',f:5},{k:'6',n:'6',t:'num',f:6},
+  {k:'E',n:'E',full:'Escalera',t:'juego',b:20,s:25},
+  {k:'F',n:'F',full:'Full',t:'juego',b:30,s:35},
+  {k:'P',n:'P',full:'Póker',t:'juego',b:40,s:45},
+  {k:'G',n:'G',full:'Generala',t:'fijo',v:50},
+  {k:'G2',n:'G2',full:'Doble',t:'fijo',v:100,req:'G'}
+];
+const NUMS=CATS.filter(c=>c.t==='num');
+const CP=[1,2,3];
+const MODES={
+  triplona:{n:'Triplona',d:'3 columnas: la 1ª vale 1 punto, la 2ª 2 y la 3ª 3. Anotás donde quieras.'},
+  simple:{n:'Simple',d:'Una sola columna. Gana el que suma más. Anotás donde quieras.'},
+  obligada:{n:'Obligada',d:'Una sola columna, en orden: 1, 2, 3… hasta la doble. Se anota lo que sale.'}
+};
+const mode=()=>(S&&S.mode)||'triplona';
+const single=()=>mode()!=='triplona';
+const ncols=m=>(m||'triplona')==='triplona'?3:1;
+const cols=()=>Array.from({length:ncols(mode())},(_,i)=>i);
+
+let S=null, view=0, draft=['',''], draftMode=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const HKEY='generala_historial';
+function loadHist(){try{return JSON.parse(localStorage.getItem(HKEY)||'[]')}catch(e){return []}}
+function saveHist(h){try{localStorage.setItem(HKEY,JSON.stringify(h))}catch(e){}}
+/* guarda la serie actual en el historial (partidas terminadas) */
+function syncHist(){
+  if(!S||!S.id)return;
+  const games=[...(S.series||[]),...(S.over?[result()]:[])];
+  let h=loadHist().filter(x=>x.id!==S.id);
+  if(games.length)h.unshift({id:S.id,mode:mode(),players:S.players,games,date:new Date().toISOString()});
+  saveHist(h.slice(0,30));
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){};syncHist()}
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function load(){try{const v=localStorage.getItem(KEY);return v?JSON.parse(v):null}catch(e){return null}}
+const P=()=>S.players.map((_,i)=>i);
+
+function emptySheet(m){return Array.from({length:ncols(m)},()=>({}))}
+function nextCat(p){const col=S.sheets[p][0];const c=CATS.find(x=>!col[x.k]);return c?c.k:null}
+function raw(p,c){return Object.values(S.sheets[p][c]).reduce((a,x)=>a+(x.v||0),0)}
+function colDone(p,c){return Object.keys(S.sheets[p][c]).length===CATS.length}
+function allDone(){return P().every(p=>cols().every(c=>colDone(p,c)))}
+/* "Doblarse": las 3 casillas de G (una por columna) ya ocupadas */
+function canDouble(p){return mode()==='obligada'||cols().every(c=>S.sheets[p][c].G)}
+
+/* máximo que le falta sumar a p en la columna c.
+   Si ya puede doblarse y le queda algún número libre en esa columna, no tiene techo. */
+function maxLeft(p,c){
+  const col=S.sheets[p][c]; let m=0;
+  for(const cat of CATS){
+    if(col[cat.k])continue;
+    if(cat.t==='num'){ if(canDouble(p)) return Infinity; m+=5*cat.f; }
+    else if(cat.t==='juego') m+=cat.s;
+    else if(cat.k==='G') m+=50;
+    else { const g=col.G; if(!g||!g.x) m+=100; }
+  }
+  return m;
+}
+
+/* estado de una columna */
+function colInfo(c){
+  const r=P().map(p=>raw(p,c));
+  const done=P().every(p=>colDone(p,c));
+  const top=Math.max(...r);
+  const leaders=P().filter(p=>r[p]===top);
+  const trail=P().filter(p=>r[p]<top).map(p=>{
+    const gap=top-r[p], left=maxLeft(p,c);
+    return {p,gap,left,reach:left>=gap};
+  });
+  // ¿algún líder puede ser alcanzado? columna definida si ningún rezagado alcanza y hay un solo líder
+  const decided=done || (leaders.length===1 && trail.every(t=>!t.reach));
+  return {c,r,done,top,leaders,trail,decided};
+}
+/* puntos de partida asegurados y potenciales */
+function match(){
+  const won=P().map(()=>0), pot=P().map(()=>0);
+  const infos=cols().map(colInfo);
+  infos.forEach(ci=>{
+    const pts=CP[ci.c];
+    if(ci.decided){ if(ci.leaders.length===1){won[ci.leaders[0]]+=pts;pot[ci.leaders[0]]+=pts} }
+    else{
+      ci.leaders.forEach(l=>pot[l]+=pts);
+      ci.trail.forEach(t=>{if(t.reach)pot[t.p]+=pts});
+    }
+  });
+  if(single()){P().forEach(p=>{won[p]=raw(p,0);pot[p]=raw(p,0)})}
+  return {won,pot,infos};
+}
+function fmtNeed(t){
+  if(!t.reach)return `<span class="bad">no alcanza (puede sumar hasta ${t.left})</span>`;
+  return `necesita <b>${t.gap}</b> para empatar`+(t.left===Infinity?' <span class="mut">· puede doblarse</span>':` <span class="mut">· le quedan hasta ${t.left}</span>`);
+}
+
+/* ---------- SETUP ---------- */
+function renderSetup(){
+  show('setup');$('subtitle').textContent='Configurá la partida';
+  const box=$('names');box.innerHTML='';
+  draft.forEach((nm,i)=>{
+    const r=document.createElement('div');r.className='namerow';
+    r.innerHTML=`<div class="ord">${i+1}</div><input type="text" maxlength="12" placeholder="Jugador ${i+1}" value="${esc(nm)}">`+(draft.length>2?'<button class="ghost small">✕</button>':'');
+    const inp=r.querySelector('input');inp.oninput=()=>draft[i]=inp.value;
+    const d=r.querySelector('button');if(d)d.onclick=()=>{draft.splice(i,1);renderSetup()};
+    box.appendChild(r);
+  });
+  $('addName').style.display=draft.length>=8?'none':'';
+  $('modePick').innerHTML=Object.entries(MODES).map(([k,m])=>`<button class="mode${draftMode===k?' sel':''}" data-m="${k}"><b>${m.n}</b><span>${m.d}</span></button>`).join('');
+  $('modePick').querySelectorAll('button').forEach(b=>b.onclick=()=>{draftMode=b.dataset.m;renderSetup()});
+  $('startBtn').disabled=!draftMode;
+  $('startBtn').textContent=draftMode?`Empezar ${MODES[draftMode].n}`:'Elegí a qué juegan';
+  const H=loadHist();
+  $('histBox').classList.toggle('hidden',!H.length);
+  $('histList').innerHTML=H.map((x,i)=>{
+    const wins=x.players.map(()=>0);x.games.forEach(g=>g.winners.forEach(p=>wins[p]++));
+    const d=new Date(x.date);
+    return `<div class="hrow"><div><div class="who">${x.players.map((n,p)=>`${esc(n)} ${wins[p]}`).join(' · ')}</div>
+      <div class="meta">${MODES[x.mode||'triplona'].n} · ${x.games.length} partida${x.games.length>1?'s':''} · ${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      <div class="btns"><button class="primary small" style="width:auto" data-i="${i}" data-a="go">Seguir</button><button class="ghost small danger" data-i="${i}" data-a="del">✕</button></div></div>`;
+  }).join('');
+  $('histList').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const x=H[+b.dataset.i];
+    if(b.dataset.a==='del'){if(confirm('¿Borrar esta serie del historial?')){saveHist(H.filter(y=>y.id!==x.id));renderSetup()}return}
+    const n=x.players.length, start=x.games.length%n;
+    S={id:x.id,mode:x.mode||'triplona',players:x.players,sheets:x.players.map(()=>emptySheet(x.mode)),turn:start,start,hist:[],series:x.games};
+    view=start;save();render();
+  });
+}
+$('addName').onclick=()=>{if(draft.length<8){draft.push('');renderSetup()}};
+$('startBtn').onclick=()=>{
+  const names=draft.map((n,i)=>n.trim()||`Jugador ${i+1}`);
+  if(!draftMode){alert('Elegí a qué se juega');return}
+  S={id:newId(),mode:draftMode,players:names,sheets:names.map(()=>emptySheet(draftMode)),turn:0,start:0,hist:[],series:[]};
+  view=0;save();render();
+};
+
+/* ---------- JUEGO ---------- */
+function renderGame(){
+  show('game');$('subtitle').textContent=MODES[mode()].n+' · '+(mode()==='obligada'?'se anota en orden, en la casilla marcada':'tocá una casilla para anotar');
+  const M=match();
+  const ser=S.series||[];
+  if(ser.length){const T=seriesTally(ser);$('seriesBar').innerHTML=`Partida ${ser.length+1} · ganadas: `+P().map(p=>`${esc(S.players[p])} <b style="color:var(--text)">${T.wins[p]}</b>`).join(' · ');$('seriesBar').classList.remove('hidden')}
+  else $('seriesBar').classList.add('hidden');
+  const tabs=$('tabs');tabs.innerHTML='';
+  P().forEach(p=>{
+    const t=document.createElement('button');
+    t.className='tab'+(p===view?' view':'')+(p===S.turn&&!S.over?' turn':'');
+    t.innerHTML=`<div class="nm">${esc(S.players[p])}</div><div class="pt">${M.won[p]}</div><div class="pl">puntos</div>`;
+    t.onclick=()=>{view=p;renderGame()};
+    tabs.appendChild(t);
+  });
+
+  /* cómo viene */
+  let st='';
+  const best=Math.max(...M.won), lead=P().filter(p=>M.won[p]===best);
+  if(!single() && best>0 && lead.length===1){
+    const others=P().filter(p=>p!==lead[0]);
+    const lines=others.map(p=>M.pot[p]>=best
+      ? `<span class="ok">${esc(S.players[p])} todavía puede alcanzarlo</span>`
+      : `<span class="bad">${esc(S.players[p])} ya no alcanza</span>`).join(' · ');
+    st+=`<div class="matchline">Va ganando <b>${esc(S.players[lead[0]])}</b> (${best}). ${lines}</div>`;
+  }
+  M.infos.forEach(ci=>{
+    let body;
+    if(ci.top===0 && !ci.done){ body='<span class="mut">Sin anotar todavía</span>'; }
+    else if(ci.leaders.length>1){
+      body=`Empatan ${ci.leaders.map(l=>esc(S.players[l])).join(' y ')} con ${ci.top}`+(ci.done?' <span class="mut">(no se la lleva nadie)</span>':'');
+      ci.trail.forEach(t=>body+=`<br>${esc(S.players[t.p])}: ${fmtNeed(t)}`);
+    } else {
+      const l=ci.leaders[0];
+      body=`${ci.decided?'Se la lleva':'Gana'} <b>${esc(S.players[l])}</b> con ${ci.top}`;
+      if(!ci.done) ci.trail.forEach(t=>body+=`<br>${esc(S.players[t.p])} (${ci.r[t.p]}): ${fmtNeed(t)}`);
+      else ci.trail.forEach(t=>body+=` <span class="mut">· ${esc(S.players[t.p])} ${ci.r[t.p]}</span>`);
+    }
+    st+=`<div class="line"><div class="hd"><span>${single()?MODES[mode()].n:ci.c+1+'ª columna'} ${ci.decided?'<span class="pill gold">definida</span>':''}</span></div>${body}</div>`;
+  });
+  $('status').innerHTML=st;
+
+  const tb=$('turnbar');
+  if(S.over){tb.className='turnbar other';tb.innerHTML=`<span>Planilla de ${esc(S.players[view])}</span><button class="ghost small" id="backEnd">Resultado</button>`;$('backEnd').onclick=()=>{S.showEnd=true;render()}}
+  else if(view===S.turn){
+    tb.className='turnbar';
+    tb.innerHTML=`<span>Tira ${esc(S.players[S.turn])}${canDouble(S.turn)?' <span style="font-weight:500;font-size:12px">· puede doblarse</span>':''}</span><button class="srv" id="srvBtn">¡Generala servida!</button>`;
+    $('srvBtn').onclick=servida;
+  } else {tb.className='turnbar other';tb.innerHTML=`<span>Mirando a ${esc(S.players[view])}</span><button class="ghost small" id="goTurn">Ir a ${esc(S.players[S.turn])}</button>`;$('goTurn').onclick=()=>{view=S.turn;renderGame()}}
+
+  const sh=S.sheets[view];
+  let h='<tr><th></th>'+cols().map(c=>`<th>${single()?MODES[mode()].n:c+1+'ª'}</th>`).join('')+'</tr>';
+  CATS.forEach((cat,i)=>{
+    if(i===6)h+='<tr class="sep"><td colspan="4"></td></tr>';
+    h+=`<tr><td class="cat">${cat.n}${cat.full?`<small>${cat.full}</small>`:''}</td>`;
+    for(const c of cols()){
+      const x=sh[c][cat.k];
+      const riv=rivOn()?rivals(c,cat.k):'';
+      if(x){
+        if(x.x)h+=`<td class="cell x">✕${riv}</td>`;
+        else h+=`<td class="cell">${allSame(c,cat.k)?`<span class="same">${x.v}</span>`:x.v}${!riv&&x.lbl?`<span class="tag${x.d?' d':''}">${x.lbl}</span>`:''}${riv}</td>`;
+      } else {
+        const notNext=mode()==='obligada'&&cat.k!==nextCat(view);
+        const lock=view!==S.turn||S.over||notNext;
+        const isNext=mode()==='obligada'&&!notNext&&view===S.turn&&!S.over;
+        h+=`<td class="cell empty${lock?' lock':''}${isNext?' next':''}" data-c="${c}" data-k="${cat.k}"><span class="dot">·</span>${riv}</td>`;
+      }
+    }
+    h+='</tr>';
+  });
+  h+='<tr class="foot"><td style="text-align:left">Suma</td>'+cols().map(c=>`<td><b>${raw(view,c)}</b>${!rivOn()?'':others().map(p=>`<span class="riv">${esc(short(p))} ${raw(p,c)}</span>`).join('')}</td>`).join('')+'</tr>';
+  $('grid').innerHTML=h;
+  $('rivChk').parentElement.classList.toggle('hidden',S.players.length>3);
+  $('rivChk').checked=S.showRiv!==false;
+  $('rivChk').onchange=e=>{S.showRiv=e.target.checked;save();renderGame()};
+  $('grid').querySelectorAll('td.empty:not(.lock)').forEach(td=>td.onclick=()=>openSheet(+td.dataset.c,td.dataset.k));
+}
+
+function openSheet(c,k){
+  const cat=CATS.find(x=>x.k===k), p=S.turn, col=S.sheets[p][c];
+  let o='', extra='';
+  if(cat.t==='num'){
+    for(let n=1;n<=5;n++)o+=`<button data-v="${n*cat.f}"><b>${n*cat.f}</b>${n*cat.f} al ${cat.f}</button>`;
+    if(canDouble(p)){
+      extra=`<div class="dbl"><b>Doblarse</b><div class="sub" style="margin:2px 0 0">Sacaste los cinco y seguiste tirando. ¿Cuántos ${cat.n} juntaste en total? (6 o más)</div>
+        <div class="row"><div class="step"><button id="dm">−</button><div class="val" id="dv">6</div><button id="dp">+</button></div>
+        <button class="primary" style="width:auto" id="dOk">Anotar ${6*cat.f}</button></div></div>`;
+    }
+  } else if(cat.t==='juego'){
+    o+=`<button data-v="${cat.b}" data-l="barata"><b>${cat.b}</b>Barata</button><button data-v="${cat.s}" data-l="servida"><b>${cat.s}</b>Servida</button>`;
+  } else {
+    const ok=!cat.req || (col[cat.req] && !col[cat.req].x);
+    o+=`<button class="wide" data-v="${cat.v}" ${ok?'':'disabled'}><b>${cat.v}</b>${cat.full}</button>`;
+    if(!ok)o+=`<div class="sub wide" style="margin:0">Para anotar la doble tenés que tener la generala anotada en esta columna.</div>`;
+    if(k==='G')o+=`<div class="sub wide" style="margin:0">Si salió servida, usá el botón “¡Generala servida!”: gana la partida.</div>`;
+  }
+  $('sheet').innerHTML=`<h3>${cat.full||'Al '+cat.n}${single()?'':' · '+(c+1)+'ª columna'}</h3>
+    <div class="sub" style="margin:0">${esc(S.players[p])}</div>
+    <div class="opts">${o}</div>${extra}
+    <button class="xbtn" id="xBtn">✕ Tachar (mongo)</button>
+    <button class="ghost" style="width:100%" id="cancel">Cancelar</button>`;
+  $('overlay').classList.remove('hidden');
+  $('sheet').querySelectorAll('.opts button:not(:disabled)').forEach(b=>b.onclick=()=>commit(c,k,{v:+b.dataset.v,lbl:b.dataset.l||''}));
+  if(extra){
+    let n=6;const upd=()=>{$('dv').textContent=n;$('dOk').textContent='Anotar '+n*cat.f};
+    $('dm').onclick=()=>{if(n>6){n--;upd()}};
+    $('dp').onclick=()=>{n++;upd()};
+    $('dOk').onclick=()=>commit(c,k,{v:n*cat.f,lbl:'doblada',d:true});
+  }
+  $('xBtn').onclick=()=>commit(c,k,{v:0,x:true});
+  $('cancel').onclick=closeSheet;
+}
+/* mismo valor anotado (no tachado) en ambas planillas */
+function same(a,b){return a&&b&&!a.x&&!b.x&&a.v===b.v}
+function allSame(c,k){const mine=S.sheets[view][c][k];return rivOn()&&others().length>0&&others().every(p=>same(mine,S.sheets[p][c][k]))}
+function rivOn(){return S.players.length<=3&&S.showRiv!==false}
+function others(){return P().filter(p=>p!==view)}
+function short(p){return S.players[p].slice(0,3)}
+function rivals(c,k){
+  return others().map(p=>{
+    const y=S.sheets[p][c][k];
+    const v=!y?'<span class="mut">·</span>':y.x?'<span class="bad">✕</span>':y.v;
+    return `<span class="riv${same(S.sheets[view][c][k],y)?' same':''}">${esc(short(p))} ${v}</span>`;
+  }).join('');
+}
+function closeSheet(){$('overlay').classList.add('hidden')}
+$('overlay').onclick=e=>{if(e.target.id==='overlay')closeSheet()};
+
+function commit(c,k,val){
+  const p=S.turn;
+  S.sheets[p][c][k]=val;
+  S.hist.push({p,c,k});
+  closeSheet();
+  if(allDone()){S.over=true;S.showEnd=true}
+  else{S.turn=(S.turn+1)%S.players.length;view=S.turn}
+  save();render();
+}
+function servida(){
+  if(!confirm(`¿${S.players[S.turn]} sacó generala servida? Gana la partida.`))return;
+  S.hist.push({p:S.turn,servida:true});
+  S.over=true;S.showEnd=true;S.servida=S.turn;
+  save();render();
+}
+function undo(){
+  const h=S.hist.pop();if(!h)return;
+  if(h.servida){S.servida=undefined}
+  else delete S.sheets[h.p][h.c][h.k];
+  S.turn=h.p;view=h.p;S.over=false;S.showEnd=false;
+  save();render();
+}
+$('undoBtn').onclick=undo;$('undoEnd').onclick=undo;
+
+/* ---------- FIN ---------- */
+function result(){
+  const M=match();
+  if(S.servida!==undefined)return {winners:[S.servida],pts:M.won,servida:true};
+  const best=Math.max(...M.won), w=P().filter(p=>M.won[p]===best);
+  return {winners:w.length===1?w:[],tie:w.length>1?w:[],pts:M.won};
+}
+function seriesTally(games){
+  const wins=P().map(()=>0), pts=P().map(()=>0);
+  games.forEach(g=>{g.winners.forEach(p=>wins[p]++);g.pts.forEach((x,p)=>pts[p]+=x)});
+  return {wins,pts};
+}
+function renderEnd(){
+  show('end');$('subtitle').textContent='Partida terminada';
+  const M=match();
+  if(S.servida!==undefined){
+    $('winnerName').textContent=S.players[S.servida];
+    $('winnerPts').textContent='¡Generala servida!';
+  } else {
+    const best=Math.max(...M.won), w=P().filter(p=>M.won[p]===best);
+    $('winnerName').textContent=w.map(p=>S.players[p]).join(' y ');
+    $('winnerPts').textContent=`${best} punto${best!==1?'s':''}`+(w.length>1?' · ¡empate!':'');
+  }
+  const all=[...(S.series||[]),result()], T=seriesTally(all);
+  const ord=P().sort((a,b)=>T.wins[b]-T.wins[a]||T.pts[b]-T.pts[a]);
+  $('series').innerHTML=`<div class="sub" style="margin:0 0 8px">${all.length} partida${all.length>1?'s':''} jugada${all.length>1?'s':''}, contando esta</div>`+
+    ord.map((p,i)=>`<div class="r ${i===0&&T.wins[p]>0?'first':''}"><span>${esc(S.players[p])}</span><span><b>${T.wins[p]}</b> ganada${T.wins[p]!==1?'s':''} <span class="mut">· ${T.pts[p]} pts</span></span></div>`).join('');
+  $('rank').innerHTML=(single()?'':M.infos.map(ci=>`<div class="r"><span>${ci.c+1}ª (${CP[ci.c]} pt${CP[ci.c]>1?'s':''})</span><span>${
+    P().map(p=>`${ci.leaders.includes(p)?'<b style="color:var(--gold)">':''}${esc(S.players[p])} ${ci.r[p]}${ci.leaders.includes(p)?'</b>':''}`).join(' · ')}</span></div>`).join(''))
+    + `<div class="r first"><span>Puntos</span><span>${P().map(p=>`${esc(S.players[p])} ${M.won[p]}`).join(' · ')}</span></div>`;
+}
+$('seeBtn').onclick=()=>{S.showEnd=false;view=0;render()};
+$('againBtn').onclick=()=>{
+  const n=S.players.length, start=((S.start||0)+1)%n;
+  const series=[...(S.series||[]),result()];
+  S={id:S.id||newId(),mode:mode(),showRiv:S.showRiv,players:S.players,sheets:S.players.map(()=>emptySheet(mode())),turn:start,start,hist:[],series};
+  view=start;save();render();
+};
+function newGame(){
+  const msg=S&&!S.over&&S.hist.length?'¿Salir al menú? La partida en curso se pierde; las partidas ya terminadas quedan en el historial.':'¿Salir al menú? La serie queda guardada en el historial.';
+  if(!confirm(msg))return;
+  draft=S?[...S.players]:['',''];S=null;
+  try{localStorage.removeItem(KEY)}catch(e){}
+  render();
+}
+$('newBtn').onclick=newGame;$('newEnd').onclick=newGame;
+
+function show(id){['setup','game','end'].forEach(s=>$(s).classList.toggle('hidden',s!==id))}
+function render(){if(!S)renderSetup();else if(S.over&&S.showEnd)renderEnd();else renderGame()}
+S=load();if(S)view=S.turn;render();
+</script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js').catch(()=>{});</script>
+</body>
+</html>

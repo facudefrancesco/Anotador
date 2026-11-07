@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#14321f">
+<title>Anotador La Base</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<style>
+.backlink{display:inline-block;color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;padding:4px 0 6px}
+:root{
+  --bg:#0f2417; --card:#173822; --card2:#1d4429; --line:#2c5a39;
+  --text:#f3efe2; --muted:#b5c2b0; --gold:#e8c35a; --ok:#6fd38a; --bad:#ef7a6a; --accent:#e8c35a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:14px 16px 90px;max-width:560px;margin:0 auto}
+h1{font-size:22px;margin:4px 0 2px;color:var(--gold);letter-spacing:.5px}
+h2{font-size:17px;margin:0 0 10px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+input[type=text],input[type=number]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}
+button{font:inherit;border:0;border-radius:12px;padding:13px 16px;font-size:16px;font-weight:600;cursor:pointer}
+.primary{background:var(--gold);color:#1b1b1b;width:100%}
+.primary:disabled{opacity:.4}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.small{padding:8px 12px;font-size:14px}
+.danger{color:var(--bad);border-color:#6a3a33}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:44px;height:44px;padding:0;font-size:22px;background:var(--card2);color:var(--text);border:1px solid var(--line)}
+.step .val{min-width:34px;text-align:center;font-size:22px;font-weight:700}
+.player{padding:10px 0;border-bottom:1px solid var(--line)}
+.player:last-child{border-bottom:0}
+.pname{font-weight:600;font-size:16px}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;background:var(--card2);color:var(--muted);margin-left:6px;vertical-align:middle}
+.tag.gold{background:var(--gold);color:#1b1b1b}
+.big{font-size:40px;font-weight:800;color:var(--gold);line-height:1}
+.info{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.info div{background:var(--card2);border-radius:10px;padding:10px}
+.info b{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:3px}
+.sum{font-size:14px;margin-top:10px;padding:10px;border-radius:10px;background:var(--card2)}
+.warn{color:var(--bad)} .good{color:var(--ok)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 6px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600}
+td.l,th.l{text-align:left}
+tr.tot td{font-weight:800;font-size:16px;color:var(--gold);border-bottom:0}
+.pos{color:var(--ok)} .neg{color:var(--bad)}
+.rank{display:flex;flex-direction:column;gap:6px}
+.rank .r{display:flex;justify-content:space-between;background:var(--card2);border-radius:10px;padding:10px 12px}
+.rank .r.first{outline:2px solid var(--gold)}
+.bar{height:6px;background:var(--bg);border-radius:4px;margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold)}
+.hidden{display:none}
+.blind{background:#3a2a10;border:1px solid #7a5a1c;color:var(--gold);border-radius:10px;padding:10px;margin-top:10px;font-size:14px}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0}
+.toggle input{width:22px;height:22px}
+.namerow{display:flex;gap:8px;margin-bottom:8px}
+.namerow .ord{width:28px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.namerow button{flex:none}
+.dealerpick{display:flex;flex-wrap:wrap;gap:8px}
+.dealerpick button{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:9px 12px;font-size:14px}
+.dealerpick button.sel{background:var(--gold);color:#1b1b1b}
+.footer{display:flex;gap:8px;margin-top:6px}
+.footer button{flex:1}
+.win{text-align:center}
+.win .big{font-size:34px;margin:10px 0}
+</style>
+</head>
+<body>
+<a class="backlink" href="../index.html">← Juegos</a>
+
+<h1>🂡 La Base</h1>
+<div class="sub" id="subtitle">Anotador de partida</div>
+
+<!-- CONFIGURACIÓN -->
+<section id="setup" class="hidden">
+  <div class="card">
+    <h2>Jugadores</h2>
+    <div class="sub" style="margin-bottom:10px">Cargalos en el orden en que están sentados, yendo hacia la derecha (el sentido en que se reparte).</div>
+    <div id="names"></div>
+    <button class="ghost small" id="addName">+ Agregar jugador</button>
+  </div>
+  <div class="card">
+    <h2>¿Quién reparte primero?</h2>
+    <div class="dealerpick" id="dealerPick"></div>
+  </div>
+  <div class="card">
+    <h2>Reglas</h2>
+    <div class="toggle"><span>Puntaje para ganar</span><input type="number" id="target" value="100" style="width:90px" inputmode="numeric"></div>
+    <div class="sub" style="margin:6px 0 0">El que reparte pide último y no puede pedir un número que haga que la suma dé justo.</div>
+  </div>
+  <button class="primary" id="startBtn">Empezar partida</button>
+</section>
+
+<!-- JUEGO -->
+<section id="game" class="hidden">
+  <div class="card">
+    <div class="row between">
+      <div><div class="sub" style="margin:0">Mano <span id="handNo"></span></div><div class="big" id="cardsNo"></div><div class="sub" style="margin:2px 0 0">cartas por jugador</div></div>
+      <div style="text-align:right"><div class="sub" style="margin:0">Próxima</div><div style="font-size:20px;font-weight:700" id="nextCards"></div></div>
+    </div>
+    <div class="info" style="margin-top:12px">
+      <div><b>Reparte</b><span id="dealerName"></span></div>
+      <div><b>Arranca</b><span id="starterName"></span></div>
+    </div>
+    <div class="blind hidden" id="blindNote">👁 Mano ciega: cada uno pone la carta en la frente. No ves la tuya, ves las de los demás.</div>
+  </div>
+
+  <div class="card" id="phaseBox">
+    <h2 id="phaseTitle"></h2>
+    <div class="sub" id="phaseHelp" style="margin-bottom:6px"></div>
+    <div id="phaseList"></div>
+    <div class="sum" id="phaseSum"></div>
+    <div style="margin-top:12px"><button class="primary" id="phaseBtn"></button></div>
+    <div style="margin-top:8px" id="backBidsWrap" class="hidden"><button class="ghost small" id="backBids" style="width:100%">← Corregir pedidos</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Posiciones</h2>
+    <div class="rank" id="rank"></div>
+  </div>
+
+  <div class="card">
+    <h2>Planilla</h2>
+    <div class="tablewrap"><table id="sheet"></table></div>
+    <div class="sub" style="margin:8px 0 0">Entre paréntesis: pidió / ganó.</div>
+  </div>
+
+  <div class="footer">
+    <button class="ghost small" id="undoBtn">↶ Deshacer mano</button>
+    <button class="ghost small danger" id="newBtn">Nueva partida</button>
+  </div>
+</section>
+
+<!-- FIN -->
+<section id="end" class="hidden">
+  <div class="card win">
+    <div style="font-size:48px">🏆</div>
+    <div class="sub" style="margin:0">Ganó</div>
+    <div class="big" id="winnerName"></div>
+    <div id="winnerPts" class="sub"></div>
+  </div>
+  <div class="card"><h2>Posiciones finales</h2><div class="rank" id="rankEnd"></div></div>
+  <div class="card"><h2>Planilla</h2><div class="tablewrap"><table id="sheetEnd"></table></div></div>
+  <div class="footer">
+    <button class="ghost small" id="undoEnd">↶ Deshacer última mano</button>
+    <button class="primary small" id="againBtn">Revancha (mismos jugadores)</button>
+  </div>
+  <div class="footer"><button class="ghost small danger" id="newEnd">Nueva partida</button></div>
+</section>
+
+<script>
+const KEY='labase_v1';
+const PATTERN=[{c:3},{c:5},{c:7},{c:7},{c:5},{c:3},{c:1},{c:1,blind:true}];
+const DECK=40;
+let S=null;
+let draftNames=['',''];
+let draftDealer=0;
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{const v=localStorage.getItem(KEY);return v?JSON.parse(v):null}catch(e){return null}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function handSpec(i,n){
+  const p=PATTERN[i%PATTERN.length];
+  const max=Math.floor(DECK/n);
+  return {cards:Math.min(p.c,max),blind:!!p.blind};
+}
+function dealerOf(i){return (S.firstDealer+i)%S.players.length}
+function orderFrom(start){const n=S.players.length;return Array.from({length:n},(_,k)=>(start+k)%n)}
+function totals(){
+  const t=S.players.map(()=>0);
+  S.hands.forEach(h=>h.pts.forEach((p,j)=>t[j]+=p));
+  return t;
+}
+function points(bid,won){return bid===won?5+bid:-1}
+
+/* ---------- SETUP ---------- */
+function renderSetup(){
+  show('setup');$('subtitle').textContent='Configurá la partida';
+  const box=$('names');box.innerHTML='';
+  draftNames.forEach((nm,i)=>{
+    const r=document.createElement('div');r.className='namerow';
+    r.innerHTML=`<div class="ord">${i+1}</div><input type="text" placeholder="Jugador ${i+1}" value="${esc(nm)}" maxlength="14">`+
+      (draftNames.length>2?`<button class="ghost small">✕</button>`:'');
+    const inp=r.querySelector('input');
+    inp.oninput=()=>{draftNames[i]=inp.value;renderDealerPick()};
+    const del=r.querySelector('button');
+    if(del)del.onclick=()=>{draftNames.splice(i,1);if(draftDealer>=draftNames.length)draftDealer=0;renderSetup()};
+    box.appendChild(r);
+  });
+  $('addName').style.display=draftNames.length>=7?'none':'';
+  renderDealerPick();
+}
+function renderDealerPick(){
+  const b=$('dealerPick');b.innerHTML='';
+  draftNames.forEach((nm,i)=>{
+    const x=document.createElement('button');
+    x.textContent=nm.trim()||`Jugador ${i+1}`;
+    if(i===draftDealer)x.className='sel';
+    x.onclick=()=>{draftDealer=i;renderDealerPick()};
+    b.appendChild(x);
+  });
+}
+$('addName').onclick=()=>{if(draftNames.length<7){draftNames.push('');renderSetup();const ins=$('names').querySelectorAll('input');ins[ins.length-1].focus()}};
+$('startBtn').onclick=()=>{
+  const names=draftNames.map((n,i)=>n.trim()||`Jugador ${i+1}`);
+  const tgt=parseInt($('target').value,10)||100;
+  S={players:names,firstDealer:draftDealer,target:tgt,hands:[],cur:null,over:false};
+  newHand();save();render();
+};
+
+/* ---------- JUEGO ---------- */
+function newHand(){
+  const n=S.players.length;
+  S.cur={phase:'bids',bids:Array(n).fill(0),won:Array(n).fill(0)};
+}
+function forbiddenPieBid(){
+  const i=S.hands.length, spec=handSpec(i,S.players.length), d=dealerOf(i);
+  const others=S.cur.bids.reduce((a,b,j)=>j===d?a:a+b,0);
+  const f=spec.cards-others;
+  return f>=0?f:null;
+}
+function renderGame(){
+  show('game');
+  const i=S.hands.length, n=S.players.length, spec=handSpec(i,n), d=dealerOf(i), start=(d+1)%n;
+  $('subtitle').textContent=`Se juega a ${S.target} puntos · ${n} jugadores`;
+  $('handNo').textContent=i+1;
+  $('cardsNo').textContent=spec.cards;
+  const nx=handSpec(i+1,n);
+  $('nextCards').textContent=nx.cards+(nx.blind?' 👁':'');
+  $('dealerName').textContent=S.players[d];
+  $('starterName').textContent=S.players[start];
+  $('blindNote').classList.toggle('hidden',!spec.blind);
+
+  const cur=S.cur, list=$('phaseList'); list.innerHTML='';
+  const ord=orderFrom(start);
+  const isBids=cur.phase==='bids';
+  $('phaseTitle').textContent=isBids?'1 · ¿Cuántas gana cada uno?':'2 · ¿Cuántas ganó cada uno?';
+  $('phaseHelp').textContent=isBids?'Pedidos en orden, empezando por el que está a la derecha del que reparte.':'Cargá las bazas que ganó cada uno al terminar la mano.';
+  $('backBidsWrap').classList.toggle('hidden',isBids);
+  const arr=isBids?cur.bids:cur.won;
+  const forb=isBids?forbiddenPieBid():null;
+
+  ord.forEach(j=>{
+    const r=document.createElement('div');r.className='player row between';
+    let tags='';
+    if(j===d)tags+='<span class="tag">reparte</span>';
+    if(j===start)tags+='<span class="tag gold">arranca</span>';
+    let extra='';
+    if(!isBids){
+      const ok=cur.bids[j]===cur.won[j];
+      extra=`<div class="sub" style="margin:2px 0 0">Pidió ${cur.bids[j]} · <span class="${ok?'good':'warn'}">${ok?'+'+(5+cur.bids[j]):'−1'}</span></div>`;
+    } else if(j===d && forb!==null){
+      extra=`<div class="sub" style="margin:2px 0 0">No puede pedir ${forb}</div>`;
+    }
+    r.innerHTML=`<div><div class="pname">${esc(S.players[j])}${tags}</div>${extra}</div>
+      <div class="step"><button>−</button><div class="val">${arr[j]}</div><button>+</button></div>`;
+    const [m,p]=r.querySelectorAll('button');
+    m.onclick=()=>{if(arr[j]>0){arr[j]--;save();renderGame()}};
+    p.onclick=()=>{if(arr[j]<spec.cards){arr[j]++;save();renderGame()}};
+    list.appendChild(r);
+  });
+
+  const sum=arr.reduce((a,b)=>a+b,0);
+  const btn=$('phaseBtn');
+  if(isBids){
+    const diff=sum-spec.cards;
+    let msg=`Pedidos: <b>${sum}</b> de ${spec.cards} bazas · `;
+    msg+=diff===0?'<span class="warn">da justo</span>':diff>0?`sobran ${diff}`:`faltan ${-diff}`;
+    const bad=forb!==null && cur.bids[d]===forb;
+    if(bad)msg+=`<br><span class="warn">${esc(S.players[d])} no puede pedir ${forb}.</span>`;
+    $('phaseSum').innerHTML=msg;
+    btn.textContent='Confirmar pedidos y jugar';
+    btn.disabled=bad;
+    btn.onclick=()=>{cur.phase='play';save();renderGame();window.scrollTo({top:0,behavior:'smooth'})};
+  } else {
+    const ok=sum===spec.cards;
+    $('phaseSum').innerHTML=`Bazas cargadas: <b>${sum}</b> de ${spec.cards} `+(ok?'<span class="good">✓</span>':`<span class="warn">(tienen que sumar ${spec.cards})</span>`);
+    btn.textContent='Cerrar mano y anotar';
+    btn.disabled=!ok;
+    btn.onclick=closeHand;
+  }
+  renderRank($('rank'));
+  renderSheet($('sheet'));
+}
+$('backBids').onclick=()=>{S.cur.phase='bids';save();renderGame()};
+
+function closeHand(){
+  const i=S.hands.length, spec=handSpec(i,S.players.length);
+  const pts=S.cur.bids.map((b,j)=>points(b,S.cur.won[j]));
+  S.hands.push({cards:spec.cards,blind:spec.blind,dealer:dealerOf(i),bids:[...S.cur.bids],won:[...S.cur.won],pts});
+  const t=totals();
+  if(Math.max(...t)>=S.target){S.over=true;S.cur=null}else newHand();
+  save();render();window.scrollTo({top:0,behavior:'smooth'});
+}
+function undo(){
+  if(!S.hands.length)return;
+  if(!confirm('¿Deshacer la última mano anotada?'))return;
+  const h=S.hands.pop();
+  S.over=false;
+  S.cur={phase:'play',bids:h.bids,won:h.won};
+  save();render();
+}
+$('undoBtn').onclick=undo;$('undoEnd').onclick=undo;
+
+function renderRank(el){
+  const t=totals(), max=Math.max(...t,1);
+  const idx=S.players.map((_,j)=>j).sort((a,b)=>t[b]-t[a]);
+  el.innerHTML=idx.map((j,k)=>{
+    const pct=Math.max(0,Math.min(100,t[j]/S.target*100));
+    return `<div class="r ${k===0&&t[j]>0?'first':''}" style="flex-direction:column">
+      <div class="row between"><span>${k+1}. ${esc(S.players[j])}</span><b>${t[j]}</b></div>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>`;
+  }).join('');
+}
+function renderSheet(el){
+  const n=S.players.length;
+  let h='<tr><th class="l">#</th>'+S.players.map(p=>`<th>${esc(p.slice(0,8))}</th>`).join('')+'</tr>';
+  S.hands.forEach((hd,i)=>{
+    h+=`<tr><td class="l">${hd.cards}${hd.blind?'👁':''}</td>`+hd.pts.map((p,j)=>
+      `<td><span class="${p>0?'pos':'neg'}">${p>0?'+':''}${p}</span><br><span style="color:var(--muted);font-size:11px">(${hd.bids[j]}/${hd.won[j]})</span></td>`).join('')+'</tr>';
+  });
+  if(!S.hands.length)h+=`<tr><td colspan="${n+1}" style="color:var(--muted)">Todavía no hay manos anotadas</td></tr>`;
+  h+='<tr class="tot"><td class="l">Tot</td>'+totals().map(t=>`<td>${t}</td>`).join('')+'</tr>';
+  el.innerHTML=h;
+}
+
+/* ---------- FIN ---------- */
+function renderEnd(){
+  show('end');$('subtitle').textContent='Partida terminada';
+  const t=totals(), max=Math.max(...t);
+  const w=S.players.filter((_,j)=>t[j]===max);
+  $('winnerName').textContent=w.join(' y ');
+  $('winnerPts').textContent=`${max} puntos en ${S.hands.length} manos`+(w.length>1?' · ¡empate!':'');
+  renderRank($('rankEnd'));renderSheet($('sheetEnd'));
+}
+$('againBtn').onclick=()=>{
+  const n=S.players.length;
+  S={...S,firstDealer:(S.firstDealer+1)%n,hands:[],over:false};
+  newHand();save();render();
+};
+function newGame(){
+  if(!confirm('¿Empezar una partida nueva? Se borra la actual.'))return;
+  draftNames=S?[...S.players]:['',''];draftDealer=0;
+  S=null;try{localStorage.removeItem(KEY)}catch(e){}
+  render();
+}
+$('newBtn').onclick=newGame;$('newEnd').onclick=newGame;
+
+function show(id){['setup','game','end'].forEach(s=>$(s).classList.toggle('hidden',s!==id))}
+function render(){if(!S)renderSetup();else if(S.over)renderEnd();else renderGame()}
+
+S=load();render();
+</script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js').catch(()=>{});</script>
+</body>
+</html>

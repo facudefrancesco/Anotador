@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Chinchón</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.cutrow{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.cutrow .chip{min-width:46px;text-align:center;font-weight:700}
+.cutbtn{background:transparent;color:var(--gold);border:1px solid #7a5a1c;padding:8px 10px;font-size:13px}
+.cutbtn.on{background:var(--gold);color:#1b1b1b}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>🃏 Chinchón</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const CUTS=[-10,1,2,3];
+let E=null; // mano que se está cargando (no se guarda hasta anotarla)
+
+const G={
+  subtitle:S=>`Afuera al pasar los ${S.opts.limit||100} · hasta ${S.opts.reeng??3} reenganches`,
+  key:'chinchon_v1', title:'Chinchón', minP:2, maxP:8,
+  options:[
+    {id:'limit',label:'Se queda afuera al pasar los',type:'number',def:100},
+    {id:'reeng',label:'Reenganches por jugador',type:'number',def:3}
+  ],
+  rules:`
+    <li>Al final de cada mano cada uno anota lo que le quedó en la mano.</li>
+    <li>El que <b>corta</b> anota lo que le quedó (1, 2 o 3) o <b>−10</b> si cortó sin nada.</li>
+    <li><b>Chinchón</b> (escalera de 7 del mismo palo) gana la partida en el acto.</li>
+    <li>El que <b>pasa los 100</b> queda afuera.</li>
+    <li><b>Reenganche:</b> hasta 3 veces por jugador. Vuelve a entrar con los puntos del que más tiene entre los que siguen.</li>
+    <li>Gana el último que queda.</li>`,
+  newState(players){
+    E=null;
+    const n=players.length;
+    return {scores:Array(n).fill(0),out:Array(n).fill(false),reeng:Array(n).fill(0),rounds:[],pending:[]};
+  },
+  result(S){
+    if(S.chinchon!==undefined)return {winners:[S.chinchon],text:'¡Chinchón!'};
+    const act=S.players.map((_,i)=>i).filter(i=>!S.out[i]);
+    if(act.length===1)return {winners:act,text:`Quedó solo con ${S.scores[act[0]]} puntos`};
+    const min=Math.min(...S.scores), w=S.players.map((_,i)=>i).filter(i=>S.scores[i]===min);
+    return {winners:w,text:'Todos pasaron el límite: gana el que menos tiene'};
+  },
+  endHtml(S){return `<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, n=S.players.length, lim=S.opts.limit||100, maxR=S.opts.reeng??3;
+    const act=()=>S.players.map((_,i)=>i).filter(i=>!S.out[i]);
+    if(!E||E.round!==S.rounds.length)E={round:S.rounds.length,vals:Array(n).fill(''),cutter:null,cutVal:null};
+    let h='';
+
+    /* reenganche pendiente */
+    if(S.pending.length){
+      const p=S.pending[0];
+      const others=act();
+      const entra=others.length?Math.max(...others.map(i=>S.scores[i])):null;
+      h+=`<div class="banner"><div><b>${esc(S.players[p])}</b> pasó los ${lim} (${S.scores[p]}).</div>
+        <div style="margin:6px 0 10px">${entra!==null?`¿Se reengancha? Entra con <b>${entra}</b>, los del que más tiene. Le quedan ${maxR-S.reeng[p]} reenganche${maxR-S.reeng[p]!==1?'s':''}.`:'No queda nadie con quien reengancharse.'}</div>
+        <div class="footer">${entra!==null?'<button class="primary small" id="reY">Se reengancha</button>':''}<button class="ghost small" id="reN">Queda afuera</button></div></div>`;
+    }
+
+    /* posiciones */
+    h+=`<div class="card"><h2>Posiciones</h2>${U.rankHtml(S.players,S.scores,{asc:true,
+      tag:p=>(S.out[p]?'<span class="pill bad">afuera</span>':'')+(S.reeng[p]?` <span class="pill">🔁 ${S.reeng[p]}</span>`:''),
+      meta:p=>S.out[p]?'':`le quedan ${lim-S.scores[p]} para pasarse`,
+      bar:p=>S.scores[p]/lim*100})}</div>`;
+
+    /* carga de la mano */
+    if(!S.pending.length){
+      h+=`<div class="card entry"><div class="row between"><h2 style="margin:0">Mano ${S.rounds.length+1}</h2>
+        <button class="cutbtn" id="chin">¡Chinchón!</button></div>
+        <div class="sub" style="margin:4px 0 0">Tocá "Cortó" en el que cortó y cargá lo que le quedó a los demás.</div>`;
+      act().forEach(p=>{
+        const isCut=E.cutter===p;
+        h+=`<div class="er"><div class="row between"><span class="nm">${esc(S.players[p])}</span>
+          <button class="cutbtn${isCut?' on':''}" data-cut="${p}">${isCut?'Cortó ✓':'Cortó'}</button></div>
+          <div style="margin-top:8px" class="row" ${isCut?'':'style="justify-content:flex-end"'}>
+          ${isCut?`<div class="cutrow" style="flex:1">${CUTS.map(v=>`<button class="chip${E.cutVal===v?' sel':''}" data-cv="${v}">${v}</button>`).join('')}</div>`
+                 :`<div class="sub" style="margin:0;flex:1">Puntos que le quedaron</div><input type="number" inputmode="numeric" min="0" data-v="${p}" value="${E.vals[p]}" placeholder="0">`}
+          </div></div>`;
+      });
+      const ok=E.cutter!==null&&E.cutVal!==null&&act().every(p=>p===E.cutter||E.vals[p]!=='');
+      h+=`<div style="margin-top:12px"><button class="primary" id="add" ${ok?'':'disabled'}>Anotar mano</button></div>
+        ${E.cutter===null?'<div class="sub" style="margin:8px 0 0">Falta marcar quién cortó.</div>':''}</div>`;
+    }
+
+    h+=`<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`;
+    $('game').innerHTML=h;
+
+    /* eventos */
+    if(S.pending.length){
+      const p=S.pending[0];
+      if($('reY'))$('reY').onclick=()=>api.mutate(S=>{
+        const others=act(); S.scores[p]=Math.max(...others.map(i=>S.scores[i]));
+        S.out[p]=false;S.reeng[p]++;S.pending.shift();checkEnd(S);
+      });
+      $('reN').onclick=()=>api.mutate(S=>{S.pending.shift();checkEnd(S)});
+      return;
+    }
+    $('game').querySelectorAll('[data-cut]').forEach(b=>b.onclick=()=>{
+      const p=+b.dataset.cut; E.cutter=E.cutter===p?null:p; E.cutVal=null; api.rerender();
+    });
+    $('game').querySelectorAll('[data-cv]').forEach(b=>b.onclick=()=>{E.cutVal=+b.dataset.cv;api.rerender()});
+    $('game').querySelectorAll('[data-v]').forEach(inp=>inp.oninput=()=>{
+      E.vals[+inp.dataset.v]=inp.value.replace(/[^0-9]/g,'');
+      const ok=E.cutter!==null&&E.cutVal!==null&&act().every(p=>p===E.cutter||E.vals[p]!=='');
+      $('add').disabled=!ok;
+    });
+    $('add').onclick=()=>api.mutate(S=>{
+      const pts=Array(n).fill(null);
+      act().forEach(p=>{pts[p]=p===E.cutter?E.cutVal:(parseInt(E.vals[p],10)||0);S.scores[p]+=pts[p]});
+      S.rounds.push({pts,cutter:E.cutter});
+      act().forEach(p=>{
+        if(S.scores[p]>lim){S.out[p]=true;if(S.reeng[p]<maxR)S.pending.push(p)}
+      });
+      E=null;
+      if(!S.pending.length)checkEnd(S);
+    });
+    $('chin').onclick=()=>api.sheet(`<h3>¡Chinchón!</h3><div class="sub" style="margin:0">¿Quién lo hizo? Gana la partida.</div>
+      <div class="opts">${act().map(p=>`<button data-w="${p}">${esc(S.players[p])}</button>`).join('')}</div>
+      <button class="ghost" style="width:100%" id="cc">Cancelar</button>`,el=>{
+        el.querySelector('#cc').onclick=api.close;
+        el.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{api.close();api.mutate(S=>{S.chinchon=+b.dataset.w;S.over=true})});
+      });
+  }
+};
+function checkEnd(S){
+  const act=S.players.map((_,i)=>i).filter(i=>!S.out[i]);
+  if(act.length<=1)S.over=true;
+}
+function planilla(S){
+  return U.sheetTable(S.players,S.rounds,S.scores,{
+    cellFmt:(v,r,j)=>(r.cutter===j?'✂ ':'')+v,
+    cls:(v,r,j)=>r.cutter===j?'gold':v<0?'pos':''
+  });
+}
+U.app(G);
+</script>
+</body>
+</html>

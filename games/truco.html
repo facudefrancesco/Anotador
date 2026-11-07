@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Truco</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.team{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 10px;text-align:center}
+.team.lead{border-color:var(--gold)}
+.team .tn{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.team .tp{font-size:40px;font-weight:800;color:var(--gold);line-height:1.1}
+.team .ts{font-size:13px;color:var(--muted);min-height:18px}
+.team .ts b{color:var(--text)}
+.team svg{display:block;margin:8px auto 6px}
+.btns{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.btns button{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:12px 0;font-size:18px;font-weight:700}
+.btns button.wide{grid-column:span 3;font-size:14px;color:var(--gold);border-color:#7a5a1c}
+.btns button.other{font-size:14px;color:var(--muted)}
+.colhead{font-size:11px;fill:var(--muted);font-family:system-ui,sans-serif;text-anchor:middle}
+.hand.pica{border-color:#7a5a1c;background:#2a2a12}
+.hand .hn{font-size:20px;font-weight:800;color:var(--gold)}
+.log{font-size:13px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>🗡️ Truco</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const G={
+  subtitle:S=>`${({'2':'1 vs 1','4':'2 vs 2','6':'3 vs 3'})[S.opts.jug||'4']} · a ${S.opts.target||30}${+S.opts.target===15?'':' (15 malas y 15 buenas)'} · ${S.opts.flor?'con flor':'sin flor'}`,
+  key:'truco_v1', title:'Truco', minP:2, maxP:2, who:'Equipo', defaults:['Nosotros','Ellos'],
+  whoNote:'dos equipos o dos jugadores',
+  options:[
+    {id:'target',label:'¿A cuánto?',type:'choice',def:'30',choices:[['30','A 30 (15 malas y 15 buenas)'],['15','A 15']]},
+    {id:'jug',label:'¿Cuántos juegan?',type:'choice',def:'4',choices:[['2','2 (1 vs 1)'],['4','4 (2 vs 2)'],['6','6 (3 vs 3)']]},
+    {id:'flor',label:'Con flor',type:'check',def:false}
+  ],
+  rules:`
+    <li>Se juega a <b>30</b>: las primeras 15 son <b>malas</b> y las otras 15 <b>buenas</b>. También se puede jugar a 15.</li>
+    <li>Tocá los puntos que ganó cada equipo en la mano (envido, truco, flor…). Con "Otro" cargás cualquier número.</li>
+    <li>Los fósforos se agrupan en cuadrados de 5: cuatro lados y una diagonal.</li>
+    <li>Gana el primero que llega a los puntos de la partida.</li>
+    <li><b>De a 6:</b> desde que un equipo llega a las <b>5 malas</b> hasta que uno llega a las <b>10 buenas</b>, se alterna una mano <b>pica-pica</b> y una <b>redonda</b>. La primera después de las 5 malas es pica-pica.</li>
+    <li>El <b>pica-pica</b> son 3 manos de 1 vs 1: anotás cada una y tocás "Terminó" para pasar a la siguiente. Después de las 3 viene una redonda.</li>`,
+  newState(){return {pts:[0,0],log:[],hand:{type:'redonda',sub:0}}},
+  result(S){
+    const w=S.pts[0]>S.pts[1]?0:1;
+    return {winners:[w],text:`${S.pts[w]} a ${S.pts[1-w]}`};
+  },
+  endHtml(S){return `<div class="card"><div class="teams" style="margin:0">${[0,1].map(t=>panel(S,t,true)).join('')}</div></div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, T=+S.opts.target||30, half=T===30?15:T;
+    let h='';
+    const st=[0,1].map(t=>S.pts[t]>half?'b':'m');
+    if(T===30&&S.pts.some(p=>p>0)){
+      let msg;
+      if(st[0]!==st[1]){const b=st[0]==='b'?0:1;msg=`<b>${esc(S.players[b])}</b> va en buenas (${S.pts[b]-half}) y <b>${esc(S.players[1-b])}</b> en malas (${S.pts[1-b]})`}
+      else if(st[0]==='b')msg='Los dos van en buenas';
+      else msg='Los dos van en malas';
+      h+=`<div class="note" style="margin:0 0 12px">${msg}</div>`;
+    }
+    if(picaOn(S)){
+      const cur=S.hand||{type:'redonda',sub:0}, nx=nextHand(S);
+      const lbl=x=>x.type==='pica'?`Pica-pica · mano ${x.sub+1} de 3`:'Redonda';
+      const max=Math.max(...S.pts);
+      const hint=max<5?'El pica-pica arranca cuando un equipo llega a las 5 malas.':max>=25&&cur.type!=='pica'?'Ya llegaron a las 10 buenas: de acá al final son todas redondas.':'';
+      h+=`<div class="card hand ${cur.type}"><div class="row between"><div><div class="sub" style="margin:0">Ahora se juega</div>
+          <div class="hn">${cur.type==='pica'?'⚔️ ':'🔄 '}${lbl(cur)}</div>${cur.type==='pica'?'<div class="sub" style="margin:2px 0 0">1 vs 1</div>':''}</div>
+          <div style="text-align:right"><div class="sub" style="margin:0">Después</div><div style="font-weight:700">${lbl(nx)}</div></div></div>
+        ${hint?`<div class="sub" style="margin:8px 0 0">${hint}</div>`:''}
+        <button class="primary" id="endHand" style="margin-top:10px">${cur.type==='pica'?`Terminó la mano ${cur.sub+1} de 3`:'Terminó la mano'}</button></div>`;
+    }
+    h+=`<div class="teams">${[0,1].map(t=>panel(S,t,false)).join('')}</div>`;
+    if(S.log.length){
+      const last=S.log.slice(-6).reverse();
+      h+=`<div class="card"><h2>Últimos puntos</h2><div class="log">${last.map(x=>`+${x.n} ${esc(S.players[x.t])}${x.l?` <span class="mut">(${x.l})</span>`:''}`).join('<br>')}</div></div>`;
+    }
+    $('game').innerHTML=h;
+    const add=(t,n,l)=>api.mutate(S=>{
+      const hl=picaOn(S)&&S.hand&&S.hand.type==='pica'?`pica ${S.hand.sub+1}`:'';
+      S.pts[t]=Math.min(T,S.pts[t]+n);S.log.push({t,n,l:[l,hl].filter(Boolean).join(' · ')});
+      if(S.pts[t]>=T)S.over=true;
+    });
+    if($('endHand'))$('endHand').onclick=()=>api.mutate(S=>{S.hand=nextHand(S)});
+    $('game').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{
+      const t=+b.dataset.t;
+      if(b.dataset.n==='otro'){
+        api.sheet(`<h3>${esc(S.players[t])}</h3><div class="sub" style="margin:0">¿Cuántos puntos?</div>
+          <div class="opts" style="grid-template-columns:repeat(4,1fr)">${Array.from({length:15},(_,i)=>`<button data-k="${i+1}"><b>${i+1}</b></button>`).join('')}</div>
+          <button class="ghost" style="width:100%" id="cc">Cancelar</button>`,el=>{
+            el.querySelector('#cc').onclick=api.close;
+            el.querySelectorAll('[data-k]').forEach(k=>k.onclick=()=>{api.close();add(t,+k.dataset.k)});
+          });
+        return;
+      }
+      add(t,+b.dataset.n,b.dataset.l);
+    });
+  }
+};
+
+/* pica-pica (solo de a 6 y a 30) */
+function picaOn(S){return S.opts.jug==='6'&&(+S.opts.target||30)===30}
+function nextHand(S){
+  const cur=S.hand||{type:'redonda',sub:0}, max=Math.max(...S.pts);
+  if(!picaOn(S))return {type:'redonda',sub:0};
+  if(cur.type==='pica')return cur.sub<2?{type:'pica',sub:cur.sub+1}:{type:'redonda',sub:0};
+  return max>=5&&max<25?{type:'pica',sub:0}:{type:'redonda',sub:0};
+}
+/* panel de un equipo con fósforos */
+function panel(S,t,readonly){
+  const esc=U.esc, T=+S.opts.target||30, half=T===30?15:T, p=S.pts[t];
+  const lead=p>S.pts[1-t];
+  let state='';
+  if(T===30)state=p>half?`<b>${p-half}</b> buenas`:`<b>${p}</b> malas`;
+  else state=`faltan <b>${T-p}</b>`;
+  let btn='';
+  if(!readonly){
+    btn=`<div class="btns">${[1,2,3,4,5,6].map(n=>`<button data-t="${t}" data-n="${n}">+${n}</button>`).join('')}
+      ${S.opts.flor?`<button class="wide" data-t="${t}" data-n="3" data-l="flor">🌸 Flor +3</button>`:''}
+      <button class="wide other" data-t="${t}" data-n="otro">Otro…</button></div>`;
+  }
+  return `<div class="team${lead?' lead':''}"><div class="tn">${esc(S.players[t])}</div><div class="tp">${p}</div><div class="ts">${state}</div>${fosforos(p,T)}${btn}</div>`;
+}
+function fosforos(p,T){
+  const sq=40, gap=12, cols=T===30?2:1, rows=3, pad=8, head=16;
+  const w=cols*sq+(cols-1)*22+pad*2, h=head+rows*sq+(rows-1)*gap+pad*2;
+  let s=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+  if(T===30){
+    s+=`<text class="colhead" x="${pad+sq/2}" y="11">malas</text><text class="colhead" x="${pad+sq+22+sq/2}" y="11">buenas</text>`;
+    const mx=pad+sq+11;s+=`<line x1="${mx}" y1="${head}" x2="${mx}" y2="${h-pad}" stroke="#2c5a39" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  }
+  for(let i=0;i<cols*rows;i++){
+    const c=Math.floor(i/rows), r=i%rows;
+    const x=pad+c*(sq+22), y=head+pad+r*(sq+gap);
+    const n=Math.max(0,Math.min(5,p-i*5));
+    const segs=[[x,y,x+sq,y],[x+sq,y,x+sq,y+sq],[x+sq,y+sq,x,y+sq],[x,y+sq,x,y],[x,y+sq,x+sq,y]];
+    s+=`<rect x="${x}" y="${y}" width="${sq}" height="${sq}" fill="none" stroke="#2c5a39" stroke-width="1" stroke-dasharray="2 3"/>`;
+    for(let k=0;k<n;k++)s+=match(...segs[k]);
+  }
+  return s+'</svg>';
+}
+function match(x1,y1,x2,y2){
+  const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),ux=dx/L,uy=dy/L;
+  const a=[x1+ux*3,y1+uy*3], b=[x2-ux*3,y2-uy*3];
+  return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#e9d7a8" stroke-width="3.2" stroke-linecap="round"/>`+
+         `<circle cx="${b[0]}" cy="${b[1]}" r="3.6" fill="#c9472f"/>`;
+}
+U.app(G);
+</script>
+</body>
+</html>

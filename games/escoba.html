@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Escoba de 15</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.cat{padding:10px 0;border-bottom:1px solid var(--line)}
+.cat:last-of-type{border-bottom:0}
+.cat .cn{font-weight:700;margin-bottom:8px}
+.cat .cn small{font-weight:400;color:var(--muted)}
+.prev{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.prev span{background:var(--card2);border-radius:10px;padding:6px 10px;font-size:14px}
+.prev b{color:var(--gold)}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>🧹 Escoba de 15</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const CATS=[
+  {k:'cartas',n:'Más cartas'},
+  {k:'oros',n:'Más oros'},
+  {k:'siete',n:'Siete de oro'},
+  {k:'setenta',n:'Setenta',s:'más sietes'}
+];
+let E=null;
+const G={
+  subtitle:S=>`A ${S.opts.target||15} puntos`,
+  key:'escoba_v1', title:'Escoba de 15', minP:2, maxP:4,
+  whoNote:'jugadores o parejas',
+  options:[{id:'target',label:'Se juega a',type:'number',def:15}],
+  rules:`
+    <li>Al terminar cada mano se cuentan los puntos de cada uno (o de cada pareja).</li>
+    <li>Cada <b>escoba</b> vale 1 punto.</li>
+    <li>También vale 1 punto cada uno de estos: <b>más cartas</b>, <b>más oros</b>, <b>siete de oro</b> y <b>setenta</b> (más sietes).</li>
+    <li>Si en alguno empatan, marcá "Nadie".</li>
+    <li>Gana el primero que llega a <b>15</b>. Si al cerrar una mano hay empate arriba, se juega otra.</li>`,
+  newState(players){E=null;return {scores:Array(players.length).fill(0),hands:[]}},
+  result(S){
+    const max=Math.max(...S.scores), w=S.players.map((_,i)=>i).filter(i=>S.scores[i]===max);
+    return {winners:w,text:`${max} puntos en ${S.hands.length} manos`};
+  },
+  endHtml(S){return `<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, n=S.players.length, T=S.opts.target||15;
+    if(!E||E.hand!==S.hands.length){E={hand:S.hands.length,esc:Array(n).fill(0)};CATS.forEach(c=>E[c.k]=null)}
+    const handPts=()=>S.players.map((_,p)=>E.esc[p]+CATS.filter(c=>E[c.k]===p).length);
+    const max=Math.max(...S.scores), tied=S.players.filter((_,i)=>S.scores[i]===max).length>1;
+    let h='';
+    if(max>=T&&tied)h+=`<div class="banner">Empatados con ${max}: se juega otra mano.</div>`;
+    h+=`<div class="card"><h2>Posiciones</h2>${U.rankHtml(S.players,S.scores,{
+      meta:p=>S.scores[p]>=T?'¡llegó!':`le faltan ${T-S.scores[p]}`, bar:p=>S.scores[p]/T*100})}</div>`;
+    h+=`<div class="card entry"><h2>Mano ${S.hands.length+1}</h2>
+      <div class="cat"><div class="cn">Escobas</div>
+      ${S.players.map((nm,p)=>`<div class="row between" style="padding:4px 0"><span class="nm">${esc(nm)}</span>
+        <div class="step"><button data-e="${p}" data-d="-1">−</button><div class="val">${E.esc[p]}</div><button data-e="${p}" data-d="1">+</button></div></div>`).join('')}
+      </div>
+      ${CATS.map(c=>`<div class="cat"><div class="cn">${c.n}${c.s?` <small>(${c.s})</small>`:''}</div><div class="chips">
+        ${S.players.map((nm,p)=>`<button class="chip${E[c.k]===p?' sel':''}" data-c="${c.k}" data-p="${p}">${esc(nm)}</button>`).join('')}
+        <button class="chip${E[c.k]===-1?' sel':''}" data-c="${c.k}" data-p="-1">Nadie</button></div></div>`).join('')}
+      <div class="prev">${handPts().map((v,p)=>`<span>${esc(S.players[p])} <b>+${v}</b></span>`).join('')}</div>
+      <div style="margin-top:12px"><button class="primary" id="add" ${CATS.every(c=>E[c.k]!==null)?'':'disabled'}>Anotar mano</button></div>
+      ${CATS.every(c=>E[c.k]!==null)?'':'<div class="sub" style="margin:8px 0 0">Marcá quién se llevó cada punto (o "Nadie").</div>'}
+    </div>`;
+    h+=`<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`;
+    $('game').innerHTML=h;
+    $('game').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const p=+b.dataset.e;E.esc[p]=Math.max(0,E.esc[p]+ +b.dataset.d);api.rerender()});
+    $('game').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{E[b.dataset.c]=+b.dataset.p;api.rerender()});
+    $('add').onclick=()=>api.mutate(S=>{
+      const pts=handPts();
+      pts.forEach((v,p)=>S.scores[p]+=v);
+      S.hands.push({pts,esc:E.esc.slice()});
+      E=null;
+      const max=Math.max(...S.scores);
+      if(max>=T&&S.scores.filter(x=>x===max).length===1)S.over=true;
+    });
+  }
+};
+function planilla(S){
+  return U.sheetTable(S.players,S.hands,S.scores,{plus:true,cellFmt:(v,r,j)=>'+'+v+(r.esc&&r.esc[j]?` <span class="mut" style="font-size:11px">🧹${r.esc[j]}</span>`:'')});
+}
+U.app(G);
+</script>
+</body>
+</html>
