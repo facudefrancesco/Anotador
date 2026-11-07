@@ -22,5 +22,10 @@ self.GAMES = [
   { id: 'rummy',    name: 'Rummy',        art: 'art/rummy.svg',    icon: '♠️', desc: 'Baraja francesa · a 1.000',                      file: 'games/rummy.html',    key: 'rummy_v1' },
   { id: 'escoba',   name: 'Escoba de 15', art: 'art/escoba.svg',   icon: '🧹', desc: 'Cartas españolas · a 15',                        file: 'games/escoba.html',   key: 'escoba_v1' },
   { id: 'chinchon', name: 'Chinchón',     art: 'art/chinchon.svg', icon: '🃏', desc: 'Cartas españolas · a 100 con reenganche',        file: 'games/chinchon.html', key: 'chinchon_v1' },
+  { id: 'uno',      name: 'UNO',          art: 'art/uno.svg',      icon: '🟥', desc: 'Pierde el que llega a 500 · de 2 a 10',         file: 'games/uno.html',      key: 'uno_v1' },
+  { id: 'chancho',  name: 'Chancho',      art: 'art/chancho.svg',  icon: '🐷', desc: 'De 3 a 8 · el que completa CHANCHO pierde',     file: 'games/chancho.html',  key: 'chancho_v1' },
+  { id: 'poker',    name: "Póker Texas Hold'em", art: 'art/poker.svg', icon: '♣️', desc: 'Fichas, ciegas y pozos · de 2 a 10', file: 'games/poker.html', key: 'poker_v1' },
+  { id: 'carioca',  name: 'Carioca',      art: 'art/carioca.svg',  icon: '🂱', desc: 'Baraja francesa · 7 manos · de 2 a 4',          file: 'games/carioca.html',  key: 'carioca_v1' },
+  { id: 'burako',   name: 'Burako',       art: 'art/burako.svg',   icon: '🀄', desc: 'Rummy con fichas · a 3.000 · de 2 a 4',         file: 'games/burako.html',   key: 'burako_v1' },
   { id: 'diez-mil', name: '10.000',       art: 'art/diez-mil.svg', icon: '🎯', desc: 'Dados · mínimo 750 para entrar',                 file: 'games/diez-mil.html', key: 'diezmil_v1' }
 ];

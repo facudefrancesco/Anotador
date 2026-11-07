@@ -107,7 +107,7 @@ tr.tot td{font-weight:800;font-size:16px;color:var(--gold);border-bottom:0}
     </div>
     <div class="info" style="margin-top:12px">
       <div><b>Reparte</b><span id="dealerName"></span></div>
-      <div><b>Arranca</b><span id="starterName"></span></div>
+      <div><b>Es mano</b><span id="starterName"></span></div>
     </div>
     <div class="blind hidden" id="blindNote">👁 Mano ciega: cada uno pone la carta en la frente. No ves la tuya, ves las de los demás.</div>
   </div>
@@ -244,16 +244,16 @@ function renderGame(){
   const ord=orderFrom(start);
   const isBids=cur.phase==='bids';
   $('phaseTitle').textContent=isBids?'1 · ¿Cuántas gana cada uno?':'2 · ¿Cuántas ganó cada uno?';
-  $('phaseHelp').textContent=isBids?'Pedidos en orden, empezando por el que está a la derecha del que reparte.':'Cargá las bazas que ganó cada uno al terminar la mano.';
+  $('phaseHelp').textContent=isBids?'Pide primero el que es mano y sigue hacia la derecha; el que reparte pide último.':'Cargá las bazas que ganó cada uno al terminar la mano.';
   $('backBidsWrap').classList.toggle('hidden',isBids);
   const arr=isBids?cur.bids:cur.won;
   const forb=isBids?forbiddenPieBid():null;
 
-  ord.forEach(j=>{
+  S.players.forEach((_,j)=>{
     const r=document.createElement('div');r.className='player row between';
     let tags='';
     if(j===d)tags+='<span class="tag">reparte</span>';
-    if(j===start)tags+='<span class="tag gold">arranca</span>';
+    if(j===start)tags+='<span class="tag gold">mano</span>';
     let extra='';
     if(!isBids){
       const ok=cur.bids[j]===cur.won[j];

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador UNO</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.outbtn{background:transparent;color:var(--gold);border:1px solid #7a5a1c;padding:8px 10px;font-size:13px}
+.outbtn.on{background:var(--gold);color:#1b1b1b}
+.calcbtn{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:10px 12px;font-size:16px}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0}
+.cards button{border:0;border-radius:10px;padding:10px 2px;font-size:16px;font-weight:800;color:#fff}
+.cards button small{display:block;font-size:10px;font-weight:600;opacity:.9}
+.c0{background:#2f6fb8}.c1{background:#c9302c}.c2{background:#2e8b4a}.c3{background:#d9a520;color:#1b1b1b!important}
+.cw{background:#1b1b1b;border:1px solid #555!important}
+.cards .wide{grid-column:span 5;display:flex;justify-content:center;gap:6px}
+.list{font-size:13px;color:var(--muted);min-height:20px;margin-bottom:8px;word-break:break-word}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>🟥 UNO</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const SPECIAL=[['+2',20],['Reversa',20],['Salta',20],['Comodín',50],['+4',50],['Dar vuelta la mano',20]];
+let E=null;
+const G={
+  key:'uno_v1', title:'UNO', minP:2, maxP:10,
+  subtitle:S=>`Pierde el que llega a ${S.opts.limit||500}`,
+  options:[{id:'limit',label:'Pierde el que llega a',type:'number',def:500}],
+  rules:`
+    <li>Al terminar cada mano, el que se quedó sin cartas suma 0 y los demás suman lo que les quedó en la mano.</li>
+    <li>Valores: los <b>números</b> valen lo que dicen · <b>+2</b>, <b>reversa</b>, <b>salta</b> y <b>dar vuelta la mano</b> valen 20 · <b>comodín</b> y <b>+4</b> valen 50.</li>
+    <li>El primero que llega a <b>500</b> pierde y termina la partida.</li>
+    <li>Gana el que tiene menos puntos en ese momento.</li>`,
+  newState(players){E=null;return {scores:Array(players.length).fill(0),hands:[]}},
+  result(S){
+    const L=S.opts.limit||500, min=Math.min(...S.scores), w=S.players.map((_,i)=>i).filter(i=>S.scores[i]===min);
+    const lost=S.players.filter((_,i)=>S.scores[i]>=L);
+    return {winners:w,text:`${min} puntos · ${lost.length>1?'perdieron':'perdió'} ${lost.map(U.esc).join(' y ')}`};
+  },
+  endHtml(S){return `<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, fmt=U.fmt, n=S.players.length, L=S.opts.limit||500;
+    if(!E||E.hand!==S.hands.length)E={hand:S.hands.length,vals:Array(n).fill(''),out:null};
+    let h=`<div class="card"><h2>Posiciones</h2>${U.rankHtml(S.players,S.scores,{asc:true,
+      meta:p=>`le faltan ${fmt(Math.max(0,L-S.scores[p]))} para perder`,bar:p=>S.scores[p]/L*100})}</div>`;
+    h+=`<div class="card entry"><h2>Mano ${S.hands.length+1}</h2>
+      <div class="sub" style="margin:0">Marcá quién se quedó sin cartas y cargá lo que le quedó a cada uno de los demás.</div>`;
+    S.players.forEach((nm,p)=>{
+      const isOut=E.out===p;
+      h+=`<div class="er"><div class="row between"><span class="nm">${esc(nm)}</span>
+          <button class="outbtn${isOut?' on':''}" data-out="${p}">${isOut?'Sin cartas ✓':'Sin cartas'}</button></div>
+        ${isOut?'<div class="sub" style="margin:6px 0 0">Suma 0 en esta mano.</div>'
+          :`<div class="row between" style="margin-top:8px"><div class="sub" style="margin:0">Total o contá<br>las cartas</div>
+            <div class="row" style="gap:6px"><button class="calcbtn" data-calc="${p}">🧮 Contar</button>
+            <input type="number" inputmode="numeric" data-v="${p}" value="${E.vals[p]}" placeholder="0"></div></div>`}
+        </div>`;
+    });
+    h+=`<div style="margin-top:12px"><button class="primary" id="add">Anotar mano</button></div>
+      <div class="sub" id="why" style="margin:8px 0 0"></div></div>`;
+    h+=`<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`;
+    $('game').innerHTML=h;
+    const upd=()=>{
+      const ok=E.out!==null&&S.players.every((_,p)=>p===E.out||E.vals[p]!=='');
+      $('add').disabled=!ok;
+      $('why').textContent=E.out===null?'Falta marcar quién se quedó sin cartas.':ok?'':'Falta cargar lo que le quedó a alguno.';
+    };
+    upd();
+    $('game').querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>{const p=+b.dataset.out;E.out=E.out===p?null:p;api.rerender()});
+    $('game').querySelectorAll('[data-v]').forEach(inp=>inp.oninput=()=>{E.vals[+inp.dataset.v]=inp.value.replace(/[^0-9]/g,'');upd()});
+    $('game').querySelectorAll('[data-calc]').forEach(b=>b.onclick=()=>calc(+b.dataset.calc,S,api));
+    $('add').onclick=()=>api.mutate(S=>{
+      const pts=S.players.map((_,p)=>p===E.out?0:(parseInt(E.vals[p],10)||0));
+      pts.forEach((v,p)=>S.scores[p]+=v);
+      S.hands.push({pts,out:E.out});
+      E=null;
+      if(S.scores.some(x=>x>=L))S.over=true;
+    });
+  }
+};
+function calc(p,S,api){
+  const esc=U.esc; let list=[];
+  const base=parseInt(E.vals[p],10)||0;
+  const draw=el=>{
+    const sum=base+list.reduce((a,c)=>a+c[1],0);
+    el.innerHTML=`<h3>Cartas en la mano</h3><div class="sub" style="margin:0">${esc(S.players[p])} · tocá cada carta que le quedó</div>
+      <div class="cards">${Array.from({length:10},(_,i)=>`<button class="c${i%4}" data-n="${i}">${i}</button>`).join('')}
+        ${SPECIAL.map((c,i)=>`<button class="${c[1]===50?'cw':'c'+((i+1)%4)}" data-s="${i}" style="${c[0].length>10?'grid-column:span 5':''}">${c[0]}<small>${c[1]}</small></button>`).join('')}</div>
+      <div class="list">${[base?`${base} ya cargados`:'',...list.map(c=>c[0])].filter(Boolean).join(' + ')||'Sin cartas'}</div>
+      <div class="row between" style="margin-bottom:10px"><div style="font-size:26px;font-weight:800;color:var(--gold)">${sum}</div>
+        <button class="ghost small" id="cu" ${list.length?'':'disabled'}>↶ Quitar última</button></div>
+      <button class="primary" id="cok" style="margin-bottom:8px">Cargar ${sum} a ${esc(S.players[p])}</button>
+      <button class="ghost" style="width:100%" id="cc">Cancelar</button>`;
+    el.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{const v=+b.dataset.n;list.push([String(v),v]);draw(el)});
+    el.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{list.push(SPECIAL[+b.dataset.s]);draw(el)});
+    el.querySelector('#cu').onclick=()=>{list.pop();draw(el)};
+    el.querySelector('#cc').onclick=api.close;
+    el.querySelector('#cok').onclick=()=>{E.vals[p]=String(sum);api.close();api.rerender()};
+  };
+  api.sheet('',draw);
+}
+function planilla(S){
+  return U.sheetTable(S.players,S.hands,S.scores,{
+    cellFmt:(v,r,j)=>r.out===j?'🏁 0':'+'+U.fmt(v),
+    cls:(v,r,j)=>r.out===j?'pos':''});
+}
+U.app(G);
+</script>
+</body>
+</html>

@@ -103,6 +103,9 @@ const U = (() => {
       const who = G.who || 'Jugador';
       const H = load(hkey(G), []);
       const optHtml = (G.options || []).map(o => {
+        if (o.show && !o.show(opts)) return '';
+        if (o.type === 'title') return `<div style="font-weight:700;margin:12px 0 2px;color:var(--gold)">${o.label}</div>`;
+        if (o.type === 'amount') return `<div style="padding:6px 0"><div style="margin-bottom:8px">${o.label}</div><div class="chips" style="align-items:center">${o.presets.map(v => `<button class="chip${+opts[o.id] === v ? ' sel' : ''}" data-am="${o.id}" data-v="${v}">${fmt(v)}</button>`).join('')}<input type="number" inputmode="numeric" data-o="${o.id}" value="${opts[o.id]}" style="width:110px;padding:9px"></div></div>`;
         if (o.type === 'check') return `<label class="toggle"><span>${o.label}</span><input type="checkbox" data-o="${o.id}" ${opts[o.id] ? 'checked' : ''}></label>`;
         if (o.type === 'number') return `<label class="toggle"><span>${o.label}</span><input type="number" inputmode="numeric" style="width:100px" data-o="${o.id}" value="${opts[o.id]}"></label>`;
         if (o.type === 'choice') return `<div style="padding:6px 0"><div style="margin-bottom:8px">${o.label}</div><div class="chips">${o.choices.map(([v, t]) => `<button class="chip${opts[o.id] === v ? ' sel' : ''}" data-c="${o.id}" data-v="${esc(v)}">${t}</button>`).join('')}</div></div>`;
@@ -141,6 +144,8 @@ const U = (() => {
         opts[el.dataset.o] = el.type === 'checkbox' ? el.checked : (parseInt(el.value, 10) || 0);
       });
       $('setup').querySelectorAll('[data-c]').forEach(el => el.onclick = () => { opts[el.dataset.c] = el.dataset.v; renderSetup() });
+      $('setup').querySelectorAll('[data-am]').forEach(el => el.onclick = () => { opts[el.dataset.am] = +el.dataset.v; renderSetup() });
+      $('setup').querySelectorAll('input[data-o][type=number]').forEach(el => el.oninput = () => { opts[el.dataset.o] = parseInt(el.value, 10) || 0 });
       $('u_start').onclick = () => {
         while (draft.length < G.minP) draft.push('');
         const players = draft.map((n, i) => n.trim() || `${who} ${i + 1}`);

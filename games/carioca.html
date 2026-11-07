@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Carioca</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.outbtn{background:transparent;color:var(--gold);border:1px solid #7a5a1c;padding:8px 10px;font-size:13px}
+.outbtn.on{background:var(--gold);color:#1b1b1b}
+.calcbtn{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:10px 12px;font-size:16px}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0}
+.cards button{border:0;border-radius:10px;padding:10px 2px;font-size:16px;font-weight:800;color:#fff}
+.cards button small{display:block;font-size:10px;font-weight:600;opacity:.9}
+.c0{background:#2f6fb8}.c1{background:#c9302c}.c2{background:#2e8b4a}.c3{background:#d9a520;color:#1b1b1b!important}
+.cw{background:#1b1b1b;border:1px solid #555!important}
+.cards .wide{grid-column:span 5;display:flex;justify-content:center;gap:6px}
+.cards.fr{grid-template-columns:repeat(3,1fr)}
+.cards.fr button{background:#fff;color:#1b1b1b;font-size:18px;padding:14px 4px}
+.cards.fr button small{color:#555}
+.mano{border-color:var(--gold)}
+.mano .obj{font-size:22px;font-weight:800;color:var(--gold)}
+.mano .nc{font-size:26px;font-weight:800;line-height:1.1}
+.steps{display:flex;gap:6px;margin-top:10px}
+.steps span{flex:1;text-align:center;padding:6px 0;border-radius:8px;background:var(--bg);color:var(--muted);font-weight:700;font-size:14px;border:1px solid var(--line)}
+.steps span.done{background:var(--card2);color:var(--ok)}
+.steps span.now{background:var(--gold);color:#1b1b1b;border-color:var(--gold)}
+.list{font-size:13px;color:var(--muted);min-height:20px;margin-bottom:8px;word-break:break-word}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>🂱 Carioca</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const MANOS=[
+  {t:'2 piernas',c:11},
+  {t:'2 escaleras',c:11},
+  {t:'1 pierna y 1 escalera',c:11},
+  {t:'2 piernas y 1 escalera',c:11},
+  {t:'1 pierna y 2 escaleras',c:11},
+  {t:'3 piernas',c:11},
+  {t:'3 escaleras',c:12}
+];
+const CARDS=[['As',20],['2 al 7',5],['8 a la K',10]];
+let E=null;
+const G={
+  key:'carioca_v1', title:'Carioca', minP:2, maxP:4,
+  whoNote:'todos contra todos o por equipos',
+  subtitle:()=>'7 manos · gana el que menos suma',
+  rules:`
+    <li>Con al menos dos barajas francesas, de 2 a 4 jugadores o equipos. Son <b>7 manos</b>.</li>
+    <li><b>Pierna:</b> 3 cartas del mismo número o figura. <b>Escalera:</b> 4 cartas seguidas del mismo palo (la más alta termina en J, Q, K, As).</li>
+    <li>Lo que hay que bajar en cada mano: ${MANOS.map((m,i)=>`<b>${i+1}ª</b> ${m.t}`).join(' · ')}.</li>
+    <li>Se reparten <b>11 cartas</b> a cada uno (en la 7ª, <b>12</b>) y una boca arriba al lado del mazo.</li>
+    <li>Se levanta del mazo o del pozo y se descarta una. Del pozo tiene prioridad la mano o el que esté más cerca.</li>
+    <li>Con el juego bajado, desde la vuelta siguiente se pueden acomodar cartas en los juegos de los demás.</li>
+    <li>El que se queda sin cartas gana la mano y no suma. Los demás suman lo que les quedó: <b>As 20</b> · <b>2 al 7: 5</b> · <b>8 a la K: 10</b>.</li>
+    <li>Al terminar las 7 manos gana el que <b>menos puntos</b> tiene.</li>`,
+  newState(players){E=null;return {scores:Array(players.length).fill(0),hands:[]}},
+  result(S){
+    const min=Math.min(...S.scores), w=S.players.map((_,i)=>i).filter(i=>S.scores[i]===min);
+    return {winners:w,text:`${U.fmt(min)} puntos después de las 7 manos`};
+  },
+  endHtml(S){return `<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, fmt=U.fmt, n=S.players.length, k=S.hands.length, M=MANOS[k];
+    if(!E||E.hand!==k)E={hand:k,vals:Array(n).fill(''),out:null};
+    let h=`<div class="card mano"><div class="row between"><div><div class="sub" style="margin:0">Mano ${k+1} de 7 · hay que bajar</div>
+        <div class="obj">${M.t}</div></div>
+        <div style="text-align:right"><div class="sub" style="margin:0">Se reparten</div><div class="nc">${M.c}</div><div class="sub" style="margin:0">cartas + 1 al pozo</div></div></div>
+      <div class="steps">${MANOS.map((m,i)=>`<span class="${i<k?'done':i===k?'now':''}" title="${m.t}">${i+1}</span>`).join('')}</div>
+      ${k<6?`<div class="sub" style="margin:8px 0 0">Después: ${MANOS[k+1].t}${MANOS[k+1].c!==11?` (${MANOS[k+1].c} cartas)`:''}</div>`:'<div class="sub" style="margin:8px 0 0">Es la última mano.</div>'}</div>`;
+    h+=`<div class="card"><h2>Posiciones</h2>${U.rankHtml(S.players,S.scores,{asc:true})}</div>`;
+    h+=`<div class="card entry"><h2>Cerrar la mano ${k+1}</h2>
+      <div class="sub" style="margin:0">Marcá quién se quedó sin cartas y cargá lo que le quedó a cada uno de los demás.</div>`;
+    S.players.forEach((nm,p)=>{
+      const isOut=E.out===p;
+      h+=`<div class="er"><div class="row between"><span class="nm">${esc(nm)}</span>
+          <button class="outbtn${isOut?' on':''}" data-out="${p}">${isOut?'Sin cartas ✓':'Sin cartas'}</button></div>
+        ${isOut?'<div class="sub" style="margin:6px 0 0">Gana la mano y suma 0.</div>'
+          :`<div class="row between" style="margin-top:8px"><div class="sub" style="margin:0">Total o contá<br>las cartas</div>
+            <div class="row" style="gap:6px"><button class="calcbtn" data-calc="${p}">🧮 Contar</button>
+            <input type="number" inputmode="numeric" data-v="${p}" value="${E.vals[p]}" placeholder="0"></div></div>`}
+        </div>`;
+    });
+    h+=`<div style="margin-top:12px"><button class="primary" id="add">Anotar mano ${k+1}</button></div>
+      <div class="sub" id="why" style="margin:8px 0 0"></div></div>`;
+    h+=`<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`;
+    $('game').innerHTML=h;
+    const upd=()=>{
+      const ok=E.out!==null&&S.players.every((_,p)=>p===E.out||E.vals[p]!=='');
+      $('add').disabled=!ok;
+      $('why').textContent=E.out===null?'Falta marcar quién se quedó sin cartas.':ok?'':'Falta cargar lo que le quedó a alguno.';
+    };
+    upd();
+    $('game').querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>{const p=+b.dataset.out;E.out=E.out===p?null:p;api.rerender()});
+    $('game').querySelectorAll('[data-v]').forEach(inp=>inp.oninput=()=>{E.vals[+inp.dataset.v]=inp.value.replace(/[^0-9]/g,'');upd()});
+    $('game').querySelectorAll('[data-calc]').forEach(b=>b.onclick=()=>calc(+b.dataset.calc,S,api));
+    $('add').onclick=()=>api.mutate(S=>{
+      const pts=S.players.map((_,p)=>p===E.out?0:(parseInt(E.vals[p],10)||0));
+      pts.forEach((v,p)=>S.scores[p]+=v);
+      S.hands.push({pts,out:E.out});
+      E=null;
+      if(S.hands.length>=7)S.over=true;
+    });
+  }
+};
+function calc(p,S,api){
+  const esc=U.esc; let list=[];
+  const base=parseInt(E.vals[p],10)||0;
+  const draw=el=>{
+    const sum=base+list.reduce((a,c)=>a+c[1],0);
+    el.innerHTML=`<h3>Cartas en la mano</h3><div class="sub" style="margin:0">${esc(S.players[p])} · tocá cada carta que le quedó</div>
+      <div class="cards fr">${CARDS.map((c,i)=>`<button data-s="${i}">${c[0]}<small>${c[1]} pts</small></button>`).join('')}</div>
+      <div class="list">${[base?`${base} ya cargados`:'',...list.map(c=>c[0])].filter(Boolean).join(' + ')||'Sin cartas'}</div>
+      <div class="row between" style="margin-bottom:10px"><div style="font-size:26px;font-weight:800;color:var(--gold)">${sum}</div>
+        <button class="ghost small" id="cu" ${list.length?'':'disabled'}>↶ Quitar última</button></div>
+      <button class="primary" id="cok" style="margin-bottom:8px">Cargar ${sum} a ${esc(S.players[p])}</button>
+      <button class="ghost" style="width:100%" id="cc">Cancelar</button>`;
+    el.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{list.push(CARDS[+b.dataset.s]);draw(el)});
+    el.querySelector('#cu').onclick=()=>{list.pop();draw(el)};
+    el.querySelector('#cc').onclick=api.close;
+    el.querySelector('#cok').onclick=()=>{E.vals[p]=String(sum);api.close();api.rerender()};
+  };
+  api.sheet('',draw);
+}
+function planilla(S){
+  return U.sheetTable(S.players,S.hands,S.scores,{
+    label:(r,i)=>`${i+1}ª`,
+    cellFmt:(v,r,j)=>r.out===j?'🏁 0':'+'+U.fmt(v),
+    cls:(v,r,j)=>r.out===j?'pos':''});
+}
+U.app(G);
+</script>
+</body>
+</html>

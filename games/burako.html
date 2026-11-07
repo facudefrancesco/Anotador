@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Burako</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.pblock{padding:12px 0;border-bottom:1px solid var(--line)}
+.pblock:last-of-type{border-bottom:0}
+.pblock .pn{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pblock .pn b{font-size:17px}
+.line{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0}
+.line .lb{font-size:14px}
+.line .lb small{display:block;color:var(--muted);font-size:12px}
+.line input{width:96px;text-align:center;font-size:17px;font-weight:700;padding:9px}
+.calcbtn{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:9px 10px;font-size:15px}
+.tg{background:transparent;color:var(--gold);border:1px solid #7a5a1c;padding:8px 10px;font-size:13px}
+.tg.on{background:var(--gold);color:#1b1b1b}
+.tg.bad{color:var(--muted);border-color:var(--line)}
+.tg.bad.on{background:#4a2420;color:#ffb3a8;border-color:#4a2420}
+.hp{text-align:right;font-size:14px;color:var(--muted);margin-top:4px}
+.hp b{color:var(--gold);font-size:17px}
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0}
+.tiles button{background:#f6efdc;border:0;border-bottom:4px solid #c9b98f;border-radius:8px;padding:10px 2px;font-size:18px;font-weight:900}
+.tiles button small{display:block;font-size:11px;font-weight:600;color:#555}
+.list{font-size:13px;color:var(--muted);min-height:20px;margin-bottom:8px;word-break:break-word}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>🀄 Burako</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const TILES=[['1',15,'#c9302c'],['2',20,'#2f6fb8'],['3 al 7',5,'#1b1b1b'],['8 al 13',10,'#2e8b4a'],['Comodín',50,'#7a5a1c']];
+let E=null;
+const G={
+  key:'burako_v1', title:'Burako', minP:2, maxP:4,
+  whoNote:'jugadores o parejas',
+  subtitle:S=>`A ${U.fmt(S.opts.target)} puntos`,
+  options:[
+    {id:'target',label:'Se juega a',type:'amount',presets:[2000,3000,5000],def:3000},
+    {id:'vT',label:'Valores',type:'title'},
+    {id:'limpia',label:'Canasta limpia',type:'number',def:200},
+    {id:'sucia',label:'Canasta sucia',type:'number',def:100},
+    {id:'cierre',label:'Por cerrar',type:'number',def:100},
+    {id:'muerto',label:'Resta por no levantar el muerto',type:'number',def:100}
+  ],
+  rules:`
+    <li>Se juega con fichas, de 2 a 4 jugadores o en parejas.</li>
+    <li>Al terminar cada mano, cada uno (o cada pareja) suma sus <b>canastas</b> y las <b>fichas bajadas</b>, y resta las <b>fichas que le quedaron en la mano</b>.</li>
+    <li><b>Canasta limpia</b> (sin comodines) 200 · <b>canasta sucia</b> (con comodín) 100 · <b>cerrar</b> 100 · <b>no levantar el muerto</b> resta 100. Se pueden cambiar en las opciones.</li>
+    <li>Valor de las fichas: <b>1</b> = 15 · <b>2</b> = 20 · <b>3 al 7</b> = 5 · <b>8 al 13</b> = 10 · <b>comodín</b> = 50.</li>
+    <li>Gana el primero que llega a <b>3.000</b>. Si al cerrar una mano hay empate arriba, se juega otra.</li>`,
+  newState(players){E=null;return {scores:Array(players.length).fill(0),hands:[]}},
+  result(S){
+    const max=Math.max(...S.scores), w=S.players.map((_,i)=>i).filter(i=>S.scores[i]===max);
+    return {winners:w,text:`${U.fmt(max)} puntos en ${S.hands.length} manos`};
+  },
+  endHtml(S){return `<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, fmt=U.fmt, n=S.players.length, T=+S.opts.target||3000, o=S.opts;
+    if(!E||E.hand!==S.hands.length)E={hand:S.hands.length,lim:Array(n).fill(0),suc:Array(n).fill(0),baj:Array(n).fill(''),mano:Array(n).fill(''),noMuerto:Array(n).fill(false),cerro:null};
+    const handPts=p=>E.lim[p]*(+o.limpia)+E.suc[p]*(+o.sucia)+(parseInt(E.baj[p],10)||0)-(parseInt(E.mano[p],10)||0)+(E.cerro===p?+o.cierre:0)-(E.noMuerto[p]?+o.muerto:0);
+    const max=Math.max(...S.scores), tied=S.scores.filter(x=>x===max).length>1;
+    let h='';
+    if(max>=T&&tied)h+=`<div class="banner">Empatados con ${fmt(max)}: se juega otra mano.</div>`;
+    h+=`<div class="card"><h2>Posiciones</h2>${U.rankHtml(S.players,S.scores,{meta:p=>`le faltan ${fmt(Math.max(0,T-S.scores[p]))}`,bar:p=>S.scores[p]/T*100})}</div>`;
+    h+=`<div class="card"><h2>Mano ${S.hands.length+1}</h2><div class="sub" style="margin:0">Cargá lo de cada uno y marcá quién cerró.</div>`;
+    S.players.forEach((nm,p)=>{
+      h+=`<div class="pblock"><div class="pn"><b>${esc(nm)}</b><button class="tg${E.cerro===p?' on':''}" data-cerro="${p}">${E.cerro===p?'Cerró ✓':'Cerró'}</button></div>
+        <div class="line"><span class="lb">Canastas limpias<small>${fmt(o.limpia)} c/u</small></span><div class="step"><button data-st="lim" data-p="${p}" data-d="-1">−</button><div class="val">${E.lim[p]}</div><button data-st="lim" data-p="${p}" data-d="1">+</button></div></div>
+        <div class="line"><span class="lb">Canastas sucias<small>${fmt(o.sucia)} c/u</small></span><div class="step"><button data-st="suc" data-p="${p}" data-d="-1">−</button><div class="val">${E.suc[p]}</div><button data-st="suc" data-p="${p}" data-d="1">+</button></div></div>
+        <div class="line"><span class="lb">Fichas bajadas<small>suman</small></span><div class="row" style="gap:6px"><button class="calcbtn" data-calc="baj" data-p="${p}">🧮</button><input type="number" inputmode="numeric" data-f="baj" data-p="${p}" value="${E.baj[p]}" placeholder="0"></div></div>
+        <div class="line"><span class="lb">Fichas en la mano<small>restan</small></span><div class="row" style="gap:6px"><button class="calcbtn" data-calc="mano" data-p="${p}">🧮</button><input type="number" inputmode="numeric" data-f="mano" data-p="${p}" value="${E.mano[p]}" placeholder="0"></div></div>
+        <div class="line"><span class="lb">Muerto</span><button class="tg bad${E.noMuerto[p]?' on':''}" data-nm="${p}">${E.noMuerto[p]?`No lo levantó −${fmt(o.muerto)}`:'Lo levantó'}</button></div>
+        <div class="hp" id="hp${p}"></div></div>`;
+    });
+    h+=`<div style="margin-top:12px"><button class="primary" id="add">Anotar mano</button></div><div class="sub" id="why" style="margin:8px 0 0"></div></div>`;
+    h+=`<div class="card"><h2>Planilla</h2>${planilla(S)}</div>`;
+    $('game').innerHTML=h;
+    const upd=()=>{
+      S.players.forEach((_,p)=>{const v=handPts(p);$('hp'+p).innerHTML=`En esta mano: <b>${v>0?'+':''}${fmt(v)}</b>`});
+      $('add').disabled=E.cerro===null;
+      $('why').textContent=E.cerro===null?'Falta marcar quién cerró.':'';
+    };
+    upd();
+    $('game').querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{const k=b.dataset.st,p=+b.dataset.p;E[k][p]=Math.max(0,E[k][p]+ +b.dataset.d);api.rerender()});
+    $('game').querySelectorAll('[data-f]').forEach(i=>i.oninput=()=>{E[i.dataset.f][+i.dataset.p]=i.value.replace(/[^0-9]/g,'');upd()});
+    $('game').querySelectorAll('[data-nm]').forEach(b=>b.onclick=()=>{const p=+b.dataset.nm;E.noMuerto[p]=!E.noMuerto[p];api.rerender()});
+    $('game').querySelectorAll('[data-cerro]').forEach(b=>b.onclick=()=>{const p=+b.dataset.cerro;E.cerro=E.cerro===p?null:p;api.rerender()});
+    $('game').querySelectorAll('[data-calc]').forEach(b=>b.onclick=()=>calc(b.dataset.calc,+b.dataset.p,S,api));
+    $('add').onclick=()=>api.mutate(S=>{
+      const pts=S.players.map((_,p)=>handPts(p));
+      pts.forEach((v,p)=>S.scores[p]+=v);
+      S.hands.push({pts,cerro:E.cerro});
+      E=null;
+      const max=Math.max(...S.scores);
+      if(max>=T&&S.scores.filter(x=>x===max).length===1)S.over=true;
+    });
+  }
+};
+function calc(field,p,S,api){
+  const esc=U.esc; let list=[];
+  const base=parseInt(E[field][p],10)||0;
+  const draw=el=>{
+    const sum=base+list.reduce((a,c)=>a+c[1],0);
+    el.innerHTML=`<h3>${field==='baj'?'Fichas bajadas':'Fichas en la mano'}</h3><div class="sub" style="margin:0">${esc(S.players[p])} · tocá cada ficha</div>
+      <div class="tiles">${TILES.map((t,i)=>`<button data-t="${i}" style="color:${t[2]};${t[0].length>2?'font-size:13px':''}">${t[0]}<small>${t[1]}</small></button>`).join('')}</div>
+      <div class="list">${[base?`${base} ya cargados`:'',...list.map(c=>c[0])].filter(Boolean).join(' + ')||'Sin fichas'}</div>
+      <div class="row between" style="margin-bottom:10px"><div style="font-size:26px;font-weight:800;color:var(--gold)">${sum}</div>
+        <button class="ghost small" id="cu" ${list.length?'':'disabled'}>↶ Quitar última</button></div>
+      <button class="primary" id="cok" style="margin-bottom:8px">Cargar ${sum}</button>
+      <button class="ghost" style="width:100%" id="cc">Cancelar</button>`;
+    el.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{list.push(TILES[+b.dataset.t]);draw(el)});
+    el.querySelector('#cu').onclick=()=>{list.pop();draw(el)};
+    el.querySelector('#cc').onclick=api.close;
+    el.querySelector('#cok').onclick=()=>{E[field][p]=String(sum);api.close();api.rerender()};
+  };
+  api.sheet('',draw);
+}
+function planilla(S){
+  return U.sheetTable(S.players,S.hands,S.scores,{plus:true,
+    cellFmt:(v,r,j)=>(r.cerro===j?'✂ ':'')+(v>0?'+':'')+U.fmt(v),
+    cls:(v,r,j)=>r.cerro===j?'gold':v<0?'neg':'pos'});
+}
+U.app(G);
+</script>
+</body>
+</html>

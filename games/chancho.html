@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Anotador Chancho</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.deal{border-color:var(--gold)}
+.deal .who{font-size:24px;font-weight:800;color:var(--gold)}
+.pl{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.pl:last-child{border-bottom:0}
+.pl .nm{font-weight:700;font-size:16px}
+.word{display:flex;gap:3px;margin-top:6px}
+.word span{width:24px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:var(--bg);color:#3c6b49;border:1px solid var(--line)}
+.word span.on{background:#e98fa6;color:#3a0f1c;border-color:#e98fa6}
+.lose{background:transparent;color:var(--bad);border:1px solid #6a3a33;padding:9px 12px;font-size:14px;flex:none}
+.pl.danger .nm::after{content:" 🐷";}
+.ttl{display:flex;align-items:center;gap:8px}
+.hpig{width:34px;height:34px}
+.snd{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--text);padding:6px 10px;font-size:16px;border-radius:10px}
+.bigpig{display:block;width:120px;height:120px;margin:0 auto 6px}
+.bigpig.shake{animation:shake .5s ease-in-out 3}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+.pop{animation:pop .35s ease-out}
+@keyframes pop{0%{transform:scale(1.6)}100%{transform:scale(1)}}
+.log{font-size:13px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1 class="ttl"><svg viewBox="-34 -38 68 68" class="hpig"><path d="M-22,-16 L-30,-34 L-10,-24 Z" fill="#e98fa6" stroke="#b4586f" stroke-width="2" stroke-linejoin="round"/><path d="M22,-16 L30,-34 L10,-24 Z" fill="#e98fa6" stroke="#b4586f" stroke-width="2" stroke-linejoin="round"/><circle r="27" fill="#f4a9bb" stroke="#b4586f" stroke-width="2"/><circle cx="-10" cy="-7" r="3.2" fill="#3a0f1c"/><circle cx="10" cy="-7" r="3.2" fill="#3a0f1c"/><ellipse cx="0" cy="9" rx="13" ry="9" fill="#e98fa6" stroke="#b4586f" stroke-width="2"/><ellipse cx="-4.5" cy="9" rx="2.4" ry="3.4" fill="#8a3a50"/><ellipse cx="4.5" cy="9" rx="2.4" ry="3.4" fill="#8a3a50"/><circle cx="-18" cy="4" r="4" fill="#f78aa5" opacity=".6"/><circle cx="18" cy="4" r="4" fill="#f78aa5" opacity=".6"/></svg> Chancho <button class="snd" id="snd" aria-label="Sonido">🔊</button></h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const WORD='CHANCHO';
+const PIG_SVG=`<svg viewBox="-34 -38 68 68" class="PIGCLS"><path d="M-22,-16 L-30,-34 L-10,-24 Z" fill="#e98fa6" stroke="#b4586f" stroke-width="2" stroke-linejoin="round"/><path d="M22,-16 L30,-34 L10,-24 Z" fill="#e98fa6" stroke="#b4586f" stroke-width="2" stroke-linejoin="round"/><circle r="27" fill="#f4a9bb" stroke="#b4586f" stroke-width="2"/><circle cx="-10" cy="-7" r="3.2" fill="#3a0f1c"/><circle cx="10" cy="-7" r="3.2" fill="#3a0f1c"/><ellipse cx="0" cy="9" rx="13" ry="9" fill="#e98fa6" stroke="#b4586f" stroke-width="2"/><ellipse cx="-4.5" cy="9" rx="2.4" ry="3.4" fill="#8a3a50"/><ellipse cx="4.5" cy="9" rx="2.4" ry="3.4" fill="#8a3a50"/><circle cx="-18" cy="4" r="4" fill="#f78aa5" opacity=".6"/><circle cx="18" cy="4" r="4" fill="#f78aa5" opacity=".6"/></svg>`;
+/* ---------- sonidos (se generan en el momento, sin archivos) ---------- */
+let AC=null, muted=U.load('chancho_mute',false);
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC}
+function grunt(t0,dur,f0,f1,vol){
+  const a=ac();if(!a)return;
+  const o=a.createOscillator(), g=a.createGain(), bp=a.createBiquadFilter(), lfo=a.createOscillator(), lg=a.createGain();
+  o.type='sawtooth';
+  o.frequency.setValueAtTime(f0,t0);o.frequency.exponentialRampToValueAtTime(f1,t0+dur);
+  lfo.frequency.value=38;lg.gain.value=f0*0.18;lfo.connect(lg);lg.connect(o.frequency);
+  bp.type='bandpass';bp.frequency.value=900;bp.Q.value=2.2;
+  g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(vol,t0+0.03);g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(bp);bp.connect(g);g.connect(a.destination);
+  // un poco de ruido para que suene "gruñido"
+  const n=a.createBufferSource(), buf=a.createBuffer(1,Math.ceil(a.sampleRate*dur),a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.5;
+  const ng=a.createGain(), nf=a.createBiquadFilter();nf.type='bandpass';nf.frequency.value=700;nf.Q.value=1.5;
+  ng.gain.setValueAtTime(0.0001,t0);ng.gain.exponentialRampToValueAtTime(vol*0.5,t0+0.02);ng.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  n.buffer=buf;n.connect(nf);nf.connect(ng);ng.connect(a.destination);
+  o.start(t0);lfo.start(t0);n.start(t0);o.stop(t0+dur+0.02);lfo.stop(t0+dur+0.02);n.stop(t0+dur+0.02);
+}
+function oink(){if(muted)return;const a=ac();if(!a)return;const t=a.currentTime+0.01;grunt(t,0.16,190,120,0.5);grunt(t+0.2,0.2,210,110,0.55)}
+function squeal(){
+  if(muted)return;const a=ac();if(!a)return;const t=a.currentTime+0.01;
+  grunt(t,0.18,180,120,0.5);grunt(t+0.22,0.18,200,120,0.5);grunt(t+0.44,0.2,220,130,0.55);
+  grunt(t+0.75,1.1,320,900,0.6);   // chillido largo que sube
+  grunt(t+1.9,0.35,260,140,0.5);
+}
+const G={
+  key:'chancho_v1', title:'Chancho', minP:3, maxP:8,
+  whoNote:'en el orden en que están sentados, yendo hacia la derecha',
+  subtitle:()=>'El que completa CHANCHO pierde',
+  rules:`
+    <li>De 3 a 8 jugadores.</li>
+    <li>En cada mano, el que pierde se anota la siguiente letra de <b>C-H-A-N-C-H-O</b>.</li>
+    <li>El que completa la palabra <b>pierde</b> la partida.</li>
+    <li>Con cada letra suena un gruñido, y cuando alguien pierde, un chillido largo. Con 🔊 lo silenciás.</li>
+    <li>Reparte cada mano el que está a la <b>derecha</b> del que repartió antes, empezando por el que elijan al principio.</li>`,
+  newState(players,o,prev){
+    const n=players.length;
+    return {letters:Array(n).fill(0),hands:[],dealer0:prev?((prev.dealer0??0)+1)%n:null};
+  },
+  result(S){
+    const L=S.loser;
+    return {winners:S.players.map((_,i)=>i).filter(i=>i!==L),text:`Perdió ${U.esc(S.players[L])}: completó CHANCHO`};
+  },
+  endHtml(S){return `<div class="card" style="text-align:center">${PIG_SVG.replace('PIGCLS','bigpig shake')}<div style="font-size:20px;font-weight:800">¡${U.esc(S.players[S.loser])} es el chancho!</div></div><div class="card"><h2>Cómo quedaron</h2>${list(S,true)}</div>`},
+  render(S,api){
+    const $=U.$, esc=U.esc, n=S.players.length;
+    setTimeout(()=>{window._popP=undefined},400);
+    let h='';
+    if(S.dealer0===null){
+      h=`<div class="card deal"><h2>¿Quién reparte primero?</h2><div class="chips">${S.players.map((nm,i)=>`<button class="chip" data-d="${i}">${esc(nm)}</button>`).join('')}</div></div>`;
+      $('game').innerHTML=h;
+      $('game').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>api.mutate(S=>{S.dealer0=+b.dataset.d}));
+      return;
+    }
+    const d=(S.dealer0+S.hands.length)%n, next=(d+1)%n;
+    h+=`<div class="card deal"><div class="row between"><div><div class="sub" style="margin:0">Mano ${S.hands.length+1} · reparte</div><div class="who">🃏 ${esc(S.players[d])}</div></div>
+      <div style="text-align:right"><div class="sub" style="margin:0">La próxima</div><div style="font-weight:700">${esc(S.players[next])}</div></div></div></div>`;
+    h+=`<div class="card"><h2>¿Quién perdió la mano?</h2>${list(S,false,d)}</div>`;
+    if(S.hands.length){
+      h+=`<div class="card"><h2>Últimas manos</h2><div class="log">${S.hands.slice(-6).map((x,i,a)=>{
+        const k=S.hands.length-a.length+i;return `Mano ${k+1}: perdió <b style="color:var(--text)">${esc(S.players[x.p])}</b> → ${WORD.slice(0,x.after)}`}).reverse().join('<br>')}</div></div>`;
+    }
+    $('game').innerHTML=h;
+    $('game').querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{
+      const p=+b.dataset.l, nl=S.letters[p]+1;
+      if(nl>=WORD.length&&!confirm(`${S.players[p]} completa CHANCHO y pierde la partida. ¿Confirmás?`))return;
+      if(nl>=WORD.length)squeal();else oink();
+      window._popP=p;
+      api.mutate(S=>{
+        S.letters[p]=nl;S.hands.push({p,after:nl,dealer:d});
+        if(nl>=WORD.length){S.loser=p;S.over=true}
+      });
+    });
+  }
+};
+function list(S,ro,dealer){
+  const esc=U.esc;
+  return S.players.map((nm,p)=>{
+    const k=S.letters[p];
+    return `<div class="pl${k===WORD.length-1?' danger':''}"><div><div class="nm">${esc(nm)}${dealer===p?' <span class="pill gold">reparte</span>':''}</div>
+      <div class="word">${[...WORD].map((c,i)=>`<span class="${i<k?'on':''}${!ro&&window._popP===p&&i===k-1?' pop':''}">${c}</span>`).join('')}</div>
+      ${!ro&&k===WORD.length-1?'<div class="sub bad" style="margin:4px 0 0">Una más y pierde</div>':''}</div>
+      ${ro?'':`<button class="lose" data-l="${p}">Perdió</button>`}</div>`;
+  }).join('');
+}
+U.app(G);
+const sb=document.getElementById('snd');
+const paintSnd=()=>{sb.textContent=muted?'🔇':'🔊'};paintSnd();
+sb.onclick=()=>{muted=!muted;U.store('chancho_mute',muted);paintSnd();if(!muted)oink()};
+</script>
+</body>
+</html>

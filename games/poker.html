@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0f2417">
+<title>Póker Texas Hold'em</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="stylesheet" href="../common.css">
+<style>
+.lvl{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lvl .bl{font-size:22px;font-weight:800;color:var(--gold)}
+.lvl .tm{font-size:13px;color:var(--muted);text-align:right}
+.lvl .tm b{color:var(--text);font-size:16px}
+.street{display:flex;justify-content:space-between;align-items:center}
+.street .sn{font-size:18px;font-weight:800}
+.board{display:flex;gap:4px}
+.board i{width:20px;height:28px;border-radius:4px;border:1px dashed var(--line);display:block}
+.board i.on{background:#f3efe2;border:0}
+.pot{font-size:30px;font-weight:800;color:var(--gold);line-height:1.1}
+.seat{display:flex;align-items:center;gap:8px;padding:9px 8px;border-radius:10px;margin-bottom:4px;background:var(--card2)}
+.seat.turn{outline:2px solid var(--gold);background:#2a3a1a}
+.seat.fold{opacity:.4}
+.seat.out{opacity:.3}
+.seat .nm{font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat .st{font-weight:800;font-size:16px;text-align:right;min-width:70px}
+.seat .bt{font-size:12px;color:var(--gold);text-align:right;min-width:58px}
+.bdg{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:11px;font-size:11px;font-weight:800;padding:0 5px;margin-left:3px}
+.bdg.d{background:#f3efe2;color:#14321f}
+.bdg.sb{background:#2f6fb8;color:#fff}
+.bdg.bb{background:#c9472f;color:#fff}
+.bdg.ai{background:var(--gold);color:#1b1b1b}
+.actcard{border-color:var(--gold)}
+.actcard .who{font-size:24px;font-weight:800;color:var(--gold)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.acts button{padding:15px 8px;font-size:17px}
+.b-fold{background:#4a2420;color:#ffb3a8}
+.b-call{background:var(--card2);color:var(--text);border:1px solid var(--line)}
+.b-raise{background:var(--gold);color:#1b1b1b}
+.b-allin{background:#7a5a1c;color:#fff}
+.amt{font-size:34px;font-weight:800;text-align:center;color:var(--gold);margin:6px 0}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.quick button{background:var(--card2);color:var(--text);border:1px solid var(--line);padding:11px 2px;font-size:13px}
+.potrow{padding:10px 0;border-bottom:1px solid var(--line)}
+.potrow:last-child{border-bottom:0}
+.res{font-size:15px;line-height:1.7}
+</style>
+</head>
+<body>
+<main>
+  <a class="backlink" href="../index.html">← Juegos</a>
+  <h1>♣️ Póker Texas Hold'em</h1>
+</main>
+<script src="../common.js"></script>
+<script>
+const STREETS=['Pre-flop','Flop','Turn','River','Showdown'];
+const BOARD=[0,3,4,5,5];
+const AMTS=[500,1000,1500,2000,5000];
+let raiseTo=null;
+
+/* ---------- reloj ---------- */
+const now=()=>Date.now();
+function mmss(ms){ms=Math.max(0,ms);const t=Math.ceil(ms/1000),h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=t%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0')}
+function runMs(S,start,pauseBase){const pz=S.pausedAt?now()-S.pausedAt:0;return now()-start-((S.pauseTotal||0)-pauseBase)-pz}
+
+/* ---------- utilidades ---------- */
+const N=S=>S.players.length;
+const nextFrom=(S,i,pred)=>{for(let k=1;k<=N(S);k++){const j=(i+k)%N(S);if(pred(j))return j}return -1};
+const alive=S=>S.players.map((_,i)=>i).filter(i=>!S.out[i]);
+const canAct=(H,j)=>!H.folded[j]&&!H.allin[j];
+const potTotal=H=>H.committed.reduce((a,b)=>a+b,0);
+
+function post(S,H,p,amt){
+  const a=Math.max(0,Math.min(amt,S.stacks[p]));
+  S.stacks[p]-=a;H.bets[p]+=a;H.committed[p]+=a;
+  if(S.stacks[p]===0)H.allin[p]=true;
+  return a;
+}
+function bumpLevel(S){
+  const o=S.opts, L=S.level;
+  let sb=L.sb;
+  if(o.how==='suma')sb+= (+o.add||0);
+  else if(o.how==='x1.5')sb=Math.max(sb+1,Math.round(sb*1.5/5)*5||Math.round(sb*1.5));
+  else sb*=2;
+  S.level={sb,n:L.n+1,start:now(),pauseBase:S.pauseTotal||0,hands:0,elim:0};
+  S.levelMsg=`¡Suben las ciegas! Ahora ${U.fmt(sb)} / ${U.fmt(sb*2)}`;
+}
+function levelDue(S){
+  const o=S.opts, L=S.level, every=Math.max(1,+o.every||1);
+  if(o.up==='tiempo')return runMs(S,L.start,L.pauseBase)>=every*60000;
+  if(o.up==='vueltas')return L.hands>=every*alive(S).length;
+  if(o.up==='elim')return L.elim>=every;
+  return false;
+}
+function levelInfo(S){
+  const o=S.opts, L=S.level, every=Math.max(1,+o.every||1);
+  if(o.up==='tiempo')return {txt:'suben en',val:mmss(every*60000-runMs(S,L.start,L.pauseBase)),id:'tL'};
+  if(o.up==='vueltas'){const left=every*alive(S).length-L.hands;return {txt:'suben en',val:`${Math.max(0,left)} mano${left!==1?'s':''}`}}
+  if(o.up==='elim'){const left=every-L.elim;return {txt:'suben en',val:`${Math.max(0,left)} eliminado${left!==1?'s':''}`}}
+  return {txt:'',val:'fijas'};
+}
+function timeUp(S){return S.opts.end==='hora'&&runMs(S,S.gameStart,0)>=(+S.opts.minutes||120)*60000}
+
+/* ---------- manos ---------- */
+function startHand(S){
+  if(levelDue(S))bumpLevel(S);else S.levelMsg='';
+  const n=N(S), sb=S.level.sb, bb=sb*2;
+  S.button=S.handNo===0?S.button0:nextFrom(S,S.button,j=>!S.out[j]);
+  const A=alive(S), heads=A.length===2;
+  const sbP=heads?S.button:nextFrom(S,S.button,j=>!S.out[j]);
+  const bbP=nextFrom(S,sbP,j=>!S.out[j]);
+  const H={street:0,bets:Array(n).fill(0),committed:Array(n).fill(0),folded:S.out.slice(),allin:Array(n).fill(false),acted:Array(n).fill(false),
+    cur:0,minRaise:bb,sb:sbP,bb:bbP,toAct:-1,last:''};
+  post(S,H,sbP,sb);post(S,H,bbP,bb);
+  H.cur=Math.max(bb,...H.bets); // aunque la grande vaya all-in con menos, se iguala la grande completa
+  S.hand=H;S.handNo++;S.level.hands++;
+  H.toAct=nextFrom(S,bbP,j=>canAct(H,j));
+  // si nadie (o uno solo) puede actuar y ya está igualado, ir directo
+  advance(S,bbP);
+}
+function advance(S,from){
+  const H=S.hand;
+  const live=S.players.map((_,i)=>i).filter(i=>!H.folded[i]);
+  if(live.length===1){finishByFold(S,live[0]);return}
+  const able=live.filter(j=>!H.allin[j]);
+  // falta hablar: el que no igualó, o el que todavía no habló (si queda alguien contra quien apostar)
+  const pending=able.filter(j=>H.bets[j]<H.cur||(!H.acted[j]&&able.length>1));
+  if(pending.length){H.toAct=nextFrom(S,from,j=>pending.includes(j));return}
+  // termina la ronda de apuestas
+  H.bets=H.bets.map(()=>0);H.acted=H.acted.map(()=>false);H.cur=0;H.minRaise=S.level.sb*2;
+  if(H.street>=3||able.length<=1){H.street=4;H.toAct=-1;setupShowdown(S);return}
+  H.street++;
+  H.toAct=nextFrom(S,S.button,j=>canAct(H,j));
+}
+function act(S,p,type,to){
+  const H=S.hand;
+  if(type==='fold'){H.folded[p]=true;H.last=`${S.players[p]} se fue`}
+  else if(type==='check'){H.last=`${S.players[p]} pasó`}
+  else if(type==='call'){const a=post(S,H,p,H.cur-H.bets[p]);H.last=`${S.players[p]} pagó ${U.fmt(a)}`+(H.allin[p]?' (all-in)':'')}
+  else{ // raise / bet / allin -> "to" es el total que queda puesto en esta ronda
+    const prevCur=H.cur;
+    post(S,H,p,to-H.bets[p]);
+    if(H.bets[p]>prevCur){
+      const inc=H.bets[p]-prevCur;
+      if(inc>=H.minRaise)H.minRaise=inc;
+      H.cur=H.bets[p];
+      S.players.forEach((_,j)=>{if(j!==p)H.acted[j]=false});
+    }
+    H.last=`${S.players[p]} ${prevCur?'subió a':'apostó'} ${U.fmt(H.bets[p])}`+(H.allin[p]?' (all-in)':'');
+  }
+  H.acted[p]=true;
+  advance(S,p);
+}
+
+/* ---------- pozos ---------- */
+function buildPots(S){
+  const H=S.hand, c=H.committed.slice(), pots=[];
+  const live=j=>!H.folded[j];
+  while(S.players.some((_,j)=>live(j)&&c[j]>0)){
+    const m=Math.min(...S.players.map((_,j)=>j).filter(j=>live(j)&&c[j]>0).map(j=>c[j]));
+    let amt=0;const el=[];
+    S.players.forEach((_,j)=>{const t=Math.min(c[j],m);amt+=t;c[j]-=t;if(live(j)&&t>0)el.push(j)});
+    pots.push({amt,el});
+  }
+  const rest=c.reduce((a,b)=>a+b,0);
+  if(rest&&pots.length)pots[pots.length-1].amt+=rest;
+  return pots;
+}
+function setupShowdown(S){
+  const pots=buildPots(S);
+  S.hand.pots=pots.map(p=>({amt:p.amt,el:p.el,win:p.el.length===1?p.el.slice():[]}));
+}
+function pay(S,winners,amt){
+  // reparte en partes iguales; lo que sobra va al primero a la izquierda del botón
+  const ord=[];for(let k=1;k<=N(S);k++){const j=(S.button+k)%N(S);if(winners.includes(j))ord.push(j)}
+  const each=Math.floor(amt/ord.length);let rest=amt-each*ord.length;
+  ord.forEach(j=>{S.stacks[j]+=each+(rest>0?1:0);if(rest>0)rest--});
+  return ord.map(j=>j);
+}
+function finishByFold(S,w){
+  const H=S.hand, amt=potTotal(H);
+  S.stacks[w]+=amt;
+  H.result=[`${S.players[w]} se lleva ${U.fmt(amt)} (los demás se fueron)`];
+  endHand(S);
+}
+function settle(S){
+  const H=S.hand, lines=[];
+  H.pots.forEach((p,i)=>{
+    pay(S,p.win,p.amt);
+    const nm=p.win.map(j=>S.players[j]).join(' y ');
+    lines.push(p.el.length===1?`${nm} recupera ${U.fmt(p.amt)}`:`${H.pots.length>1?(i===0?'Pozo principal':'Pozo lateral '+i)+': ':''}${nm} ${p.win.length>1?'se reparten':'gana'} ${U.fmt(p.amt)}`);
+  });
+  H.result=lines;
+  endHand(S);
+}
+function endHand(S){
+  const H=S.hand;H.done=true;H.toAct=-1;
+  S.pending=S.players.map((_,i)=>i).filter(i=>!S.out[i]&&S.stacks[i]===0);
+  S.log.unshift({n:S.handNo,lines:H.result});S.log=S.log.slice(0,12);
+  checkPending(S);
+}
+function checkPending(S){
+  if(S.pending.length)return;
+  const A=alive(S);
+  if(A.length<=1){S.over=true;S.reason='todos';return}
+  if(timeUp(S)){S.over=true;S.reason='hora';return}
+}
+function eliminate(S,p){
+  S.out[p]=true;S.elimOrder.push(p);S.level.elim++;
+}
+
+function blindsText(o){
+  if(o.up==='nunca')return 'Las ciegas no suben.';
+  const n=+o.every||1, cada=o.up==='tiempo'?`cada ${n} minuto${n>1?'s':''}`:o.up==='vueltas'?`cada ${n} vuelta${n>1?'s':''}`:`cada ${n} eliminado${n>1?'s':''}`;
+  const cuanto=o.how==='x2'?'se duplican':o.how==='x1.5'?'se multiplican por 1,5':`suman ${U.fmt(o.add)} a la chica`;
+  return `Suben ${cada} y ${cuanto}.`;
+}
+/* ---------- juego ---------- */
+const G={
+  key:'poker_v1', title:"Póker", minP:2, maxP:10,
+  whoNote:'en el orden en que están sentados, hacia la izquierda',
+  subtitle:S=>`Arrancan con ${U.fmt(S.opts.start)} · ${S.opts.end==='hora'?`se juega ${S.opts.minutes} minutos`:'hasta que uno tenga todo'}`,
+  options:[
+    {id:'start',label:'Fichas iniciales por jugador',type:'amount',presets:AMTS,def:1000},
+    {id:'sb',label:'Ciega chica (la grande es el doble)',type:'amount',presets:[5,10,25,50,100],def:10},
+    {id:'blT',label:'Ciegas',type:'title'},
+    {id:'up',label:'¿Cómo suben las ciegas? Por tiempo, por vueltas o por jugador eliminado',type:'choice',def:'tiempo',choices:[['nunca','No suben'],['vueltas','Por vueltas'],['tiempo','Por tiempo'],['elim','Por eliminados']]},
+    {id:'every',label:'Cada cuántas vueltas / minutos / eliminados',type:'number',def:15,show:o=>o.up!=='nunca'},
+    {id:'how',label:'¿Cuánto suben?',type:'choice',def:'x2',choices:[['x2','Se duplican'],['x1.5','× 1,5'],['suma','Suman un monto fijo']],show:o=>o.up!=='nunca'},
+    {id:'add',label:'Monto que suman a la chica',type:'number',def:10,show:o=>o.up!=='nunca'&&o.how==='suma'},
+    {id:'rebuys',label:'Recompras por jugador',type:'number',def:2},
+    {id:'rebuyAmt',label:'Monto de la recompra',type:'amount',presets:AMTS,def:1000,show:o=>(+o.rebuys||0)>0},
+    {id:'end',label:'Se termina…',type:'choice',def:'todos',choices:[['todos','Cuando uno tiene todo'],['hora','Por tiempo']]},
+    {id:'minutes',label:'Duración en minutos',type:'number',def:120,show:o=>o.end==='hora'}
+  ],
+  rules:`
+    <li>Las cartas son las de verdad: el celular queda en el medio y lleva las fichas, las ciegas, el turno y el pozo.</li>
+    <li>Cada uno dice su jugada en voz alta y se toca: <b>Me voy</b>, <b>Paso</b>, <b>Pago</b>, <b>Subo</b> o <b>All-in</b>.</li>
+    <li>El <b>botón</b> (D) avanza hacia la izquierda en cada mano. A su izquierda ponen la <b>chica</b> y la <b>grande</b>. Mano a mano, el botón pone la chica.</li>
+    <li>Pre-flop habla primero el de la izquierda de la grande; en el flop, turn y river, el primero que sigue en juego a la izquierda del botón.</li>
+    <li>La subida mínima es igual a la última subida (o a la grande si nadie subió).</li>
+    <li>Si alguien va all-in con menos, la app arma solos los <b>pozos laterales</b>. En el showdown elegís quién ganó cada pozo (si empatan, marcás a los dos).</li>
+    <li>El que se queda sin fichas puede <b>recomprar</b> hasta 2 veces.</li>
+    <li>Las ciegas suben por vueltas, tiempo o eliminados, según lo que eligieron. Con tiempo, ⏸ pausa el reloj.</li>`,
+  newState(players,o,prev){
+    const n=players.length, st=+o.start||1000;
+    return {stacks:Array(n).fill(st),out:Array(n).fill(false),rebuys:Array(n).fill(0),elimOrder:[],
+      level:{sb:+o.sb||10,n:1,start:0,pauseBase:0,hands:0,elim:0},button0:prev?((prev.button0??0)+1)%n:null,button:0,
+      handNo:0,hand:null,pending:[],log:[],gameStart:0,pauseTotal:0,pausedAt:null,started:false};
+  },
+  result(S){
+    const max=Math.max(...S.stacks), w=S.players.map((_,i)=>i).filter(i=>S.stacks[i]===max&&!S.out[i]);
+    return {winners:w,text:S.reason==='hora'?`Se cumplió el tiempo · ${U.fmt(max)} fichas`:`Se quedó con todo · ${U.fmt(max)} fichas`};
+  },
+  endHtml(S){
+    const fin=S.players.map((_,i)=>i).sort((a,b)=>S.stacks[b]-S.stacks[a]);
+    return `<div class="card"><h2>Fichas finales</h2>${U.rankHtml(S.players,S.stacks,{
+      meta:p=>[S.rebuys[p]?`${S.rebuys[p]} recompra${S.rebuys[p]>1?'s':''}`:'',S.out[p]?`eliminado ${S.elimOrder.indexOf(p)+1}º`:''].filter(Boolean).join(' · ')})}</div>`;
+  },
+  render(S,api){
+    const $=U.$, esc=U.esc, fmt=U.fmt;
+    /* elegir botón inicial */
+    if(!S.started){
+      $('game').innerHTML=`<div class="card actcard"><h2>¿Quién tiene el botón (reparte) en la primera mano?</h2><div class="chips">${S.players.map((nm,i)=>`<button class="chip${S.button0===i?' sel':''}" data-b="${i}">${esc(nm)}</button>`).join('')}</div>
+        <div class="note" style="margin-top:12px;line-height:1.6">Ciegas <b>${fmt(S.opts.sb)} / ${fmt(S.opts.sb*2)}</b> · ${S.players.length} jugadores con ${fmt(S.opts.start)} cada uno.<br>
+          ${blindsText(S.opts)}<br>
+          ${S.opts.end==='hora'?`Termina a los ${S.opts.minutes} minutos.`:'Termina cuando uno se queda con todo.'}<br>
+          <span class="sub">Para cambiar algo, tocá "Salir al menú".</span></div>
+        <button class="primary" id="go" style="margin-top:12px" ${S.button0===null?'disabled':''}>Repartir la primera mano</button></div>`;
+      $('game').querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{S.button0=+b.dataset.b;api.save();api.rerender()});
+      $('go').onclick=()=>api.mutate(S=>{S.started=true;S.gameStart=now();S.level.start=now();S.level.pauseBase=0;startHand(S)});
+      return;
+    }
+    const H=S.hand, L=S.level, li=levelInfo(S);
+    let h='';
+    /* nivel y reloj */
+    const timed=S.opts.up==='tiempo'||S.opts.end==='hora';
+    h+=`<div class="card lvl"><div><div class="sub" style="margin:0">Nivel ${L.n} · ciegas</div><div class="bl">${fmt(L.sb)} / ${fmt(L.sb*2)}</div></div>
+      <div class="tm">${li.txt?`${li.txt}<br><b id="${li.id||''}">${li.val}</b>`:`<b>${li.val}</b>`}
+      ${S.opts.end==='hora'?`<br>termina en <b id="tG">${mmss((+S.opts.minutes||120)*60000-runMs(S,S.gameStart,0))}</b>`:''}</div>
+      ${timed?`<button class="ghost small" id="pz" style="flex:none">${S.pausedAt?'▶':'⏸'}</button>`:''}</div>`;
+    if(S.pausedAt)h+=`<div class="banner">⏸ Reloj en pausa.</div>`;
+    if(S.levelMsg&&H&&!H.done&&H.street===0)h+=`<div class="banner">${S.levelMsg}</div>`;
+    if(S.opts.end==='hora'&&timeUp(S)&&H&&!H.done)h+=`<div class="banner">⏰ Se cumplió el tiempo: <b>esta es la última mano</b>.</div>`;
+
+    /* recompras pendientes */
+    if(S.pending.length){
+      const p=S.pending[0], left=(+S.opts.rebuys||0)-S.rebuys[p];
+      h+=`<div class="banner"><div><b>${esc(S.players[p])}</b> se quedó sin fichas.</div>
+        <div style="margin:6px 0 10px">${left>0?`¿Recompra ${fmt(S.opts.rebuyAmt)}? Le queda${left>1?'n':''} ${left} recompra${left>1?'s':''}.`:'Ya no le quedan recompras.'}</div>
+        <div class="footer">${left>0?'<button class="primary small" id="rbY">Recompra</button>':''}<button class="ghost small" id="rbN">Queda eliminado</button></div></div>`;
+    }
+
+    /* calle, pozo y mesa */
+    if(H){
+      const pot=potTotal(H);
+      h+=`<div class="card"><div class="street"><div><div class="sn">Mano ${S.handNo} · ${H.done?'Terminada':STREETS[H.street]}</div>
+          ${H.last&&!H.done?`<div class="sub" style="margin:2px 0 0">${esc(H.last)}</div>`:''}</div>
+          <div class="board">${[0,1,2,3,4].map(i=>`<i class="${i<BOARD[H.street]?'on':''}"></i>`).join('')}</div></div>
+        <div class="row between" style="margin:8px 0 10px"><div><div class="sub" style="margin:0">Pozo</div><div class="pot">${fmt(pot)}</div></div>
+          ${H.cur&&!H.done&&H.street<4?`<div style="text-align:right"><div class="sub" style="margin:0">Apuesta a igualar</div><div style="font-size:20px;font-weight:800">${fmt(H.cur)}</div></div>`:''}</div>`;
+      S.players.forEach((nm,j)=>{
+        const cls=S.out[j]?'out':H.folded[j]?'fold':j===H.toAct?'turn':'';
+        h+=`<div class="seat ${cls}"><span class="nm">${esc(nm)}${j===S.button&&!S.out[j]?'<span class="bdg d">D</span>':''}${j===H.sb&&!S.out[j]?'<span class="bdg sb">CH</span>':''}${j===H.bb&&!S.out[j]?'<span class="bdg bb">GR</span>':''}${H.allin[j]&&!H.folded[j]?'<span class="bdg ai">ALL-IN</span>':''}</span>
+          <span class="bt">${S.out[j]?'afuera':H.folded[j]?'se fue':H.bets[j]?'puso '+fmt(H.bets[j]):''}</span>
+          <span class="st">${fmt(S.stacks[j])}</span></div>`;
+      });
+      h+='</div>';
+    }
+
+    /* acción del turno */
+    if(H&&!H.done&&H.street<4&&H.toAct>=0){
+      const p=H.toAct, need=H.cur-H.bets[p], st=S.stacks[p];
+      const canRaise=st>need;
+      h+=`<div class="card actcard"><div class="sub" style="margin:0">Le toca a</div><div class="who">${esc(S.players[p])}</div>
+        <div class="sub" style="margin:2px 0 0">Tiene ${fmt(st)}${need?` · para pagar: <b style="color:var(--text)">${fmt(Math.min(need,st))}</b>`:''}</div>
+        <div class="acts">
+          <button class="b-fold" id="aF">Me voy</button>
+          ${need?`<button class="b-call" id="aC">${need>=st?'Pagar all-in '+fmt(st):'Pago '+fmt(need)}</button>`:'<button class="b-call" id="aK">Paso</button>'}
+          ${canRaise?`<button class="b-raise" id="aR">${H.cur?'Subo…':'Apuesto…'}</button>`:''}
+          <button class="b-allin" id="aA" ${canRaise?'':'style="grid-column:span 2"'}>All-in ${fmt(st+H.bets[p])}</button>
+        </div></div>`;
+    }
+
+    /* showdown */
+    if(H&&!H.done&&H.street===4){
+      h+=`<div class="card actcard"><h2>Showdown: ¿quién ganó?</h2><div class="sub" style="margin:0 0 4px">Si empatan, marcá a todos los que se reparten.</div>
+        ${H.pots.map((pt,i)=>`<div class="potrow"><div class="row between"><b>${H.pots.length>1?(i===0?'Pozo principal':'Pozo lateral '+i):'Pozo'}</b><span class="gold" style="font-weight:800">${fmt(pt.amt)}</span></div>
+          ${pt.el.length===1?`<div class="sub" style="margin:6px 0 0">Vuelve a ${esc(S.players[pt.el[0]])} (nadie lo igualó)</div>`:
+          `<div class="chips" style="margin-top:8px">${pt.el.map(j=>`<button class="chip${pt.win.includes(j)?' sel':''}" data-pw="${i}" data-pj="${j}">${esc(S.players[j])}</button>`).join('')}</div>`}</div>`).join('')}
+        <button class="primary" id="pay" style="margin-top:10px" ${H.pots.every(p=>p.win.length)?'':'disabled'}>Pagar</button></div>`;
+    }
+
+    /* resultado de la mano */
+    if(H&&H.done&&!S.over){
+      h+=`<div class="card actcard"><h2>Mano ${S.handNo} terminada</h2><div class="res">${H.result.map(esc).join('<br>')}</div>
+        ${S.pending.length?'<div class="sub" style="margin:10px 0 0">Primero resolvé la recompra de arriba.</div>':`<button class="primary" id="next" style="margin-top:12px">Repartir la mano ${S.handNo+1}</button>`}</div>`;
+    }
+
+    if(S.log.length>1){
+      h+=`<details class="card"><summary style="font-weight:700">Manos anteriores</summary><div class="res sub" style="margin:8px 0 0">${S.log.slice(1).map(x=>`<b style="color:var(--text)">Mano ${x.n}:</b> ${x.lines.map(esc).join(' · ')}`).join('<br>')}</div></details>`;
+    }
+    $('game').innerHTML=h;
+
+    /* eventos */
+    if($('pz'))$('pz').onclick=()=>api.mutate(S=>{if(S.pausedAt){S.pauseTotal=(S.pauseTotal||0)+(now()-S.pausedAt);S.pausedAt=null}else S.pausedAt=now()});
+    if(S.pending.length){
+      const p=S.pending[0];
+      if($('rbY'))$('rbY').onclick=()=>api.mutate(S=>{S.stacks[p]+=+S.opts.rebuyAmt||+S.opts.start;S.rebuys[p]++;S.pending.shift();checkPending(S)});
+      $('rbN').onclick=()=>api.mutate(S=>{eliminate(S,p);S.pending.shift();checkPending(S)});
+    }
+    if($('aF'))$('aF').onclick=()=>api.mutate(S=>act(S,S.hand.toAct,'fold'));
+    if($('aK'))$('aK').onclick=()=>api.mutate(S=>act(S,S.hand.toAct,'check'));
+    if($('aC'))$('aC').onclick=()=>api.mutate(S=>act(S,S.hand.toAct,'call'));
+    if($('aA'))$('aA').onclick=()=>{const p=H.toAct;api.mutate(S=>act(S,p,'raise',S.stacks[p]+S.hand.bets[p]))};
+    if($('aR'))$('aR').onclick=()=>raiseSheet(S,api);
+    $('game').querySelectorAll('[data-pw]').forEach(b=>b.onclick=()=>{
+      const pt=H.pots[+b.dataset.pw], j=+b.dataset.pj;
+      pt.win=pt.win.includes(j)?pt.win.filter(x=>x!==j):[...pt.win,j];api.save();api.rerender();
+    });
+    if($('pay'))$('pay').onclick=()=>api.mutate(S=>settle(S));
+    if($('next'))$('next').onclick=()=>api.mutate(S=>startHand(S));
+  }
+};
+
+function raiseSheet(S,api){
+  const H=S.hand, p=H.toAct, fmt=U.fmt, esc=U.esc;
+  const max=S.stacks[p]+H.bets[p], minTo=Math.min(max,H.cur+H.minRaise), bb=S.level.sb*2;
+  const pot=potTotal(H), call=H.cur-H.bets[p];
+  const potTo=Math.min(max,H.cur+pot+call), halfTo=Math.min(max,H.cur+Math.round((pot+call)/2));
+  const isBet=!H.cur;
+  let v=minTo; // total que queda puesto en esta ronda
+  const draw=(el,keepInput)=>{
+    v=Math.max(minTo,Math.min(max,v));
+    const by=v-H.cur;
+    el.innerHTML=`<h3>${esc(S.players[p])} ${isBet?'apuesta':'sube'}</h3>
+      <div class="sub" style="margin:0">${isBet?`Mínimo ${fmt(minTo)}`:`Apuesta actual ${fmt(H.cur)} · subida mínima ${fmt(H.minRaise)}`} · tiene ${fmt(max)}</div>
+      <div style="margin:12px 0 4px;font-weight:700">${isBet?'¿Cuánto apostás?':'¿Cuánto subís?'} <span class="mut" style="font-weight:400;font-size:13px">(escribilo)</span></div>
+      <div class="row" style="gap:8px"><div class="step"><button id="m">−</button></div>
+        <input type="number" inputmode="numeric" id="vi" value="${by}" style="flex:1;text-align:center;font-size:26px;font-weight:800">
+        <div class="step"><button id="pl">+</button></div></div>
+      <div class="sub" id="tot" style="margin:6px 0 0;text-align:center">${isBet?'':`Queda en <b style="color:var(--text)">${fmt(v)}</b> · `}pone ${fmt(v-H.bets[p])} de sus fichas${v>=max?' · <b class="gold">all-in</b>':''}</div>
+      <div class="quick">
+        <button data-v="${minTo}">Mínimo</button><button data-v="${halfTo}">½ pozo</button><button data-v="${potTo}">Pozo</button><button data-v="${max}">All-in</button>
+        ${[1,2,5,10].map(k=>`<button data-add="${k*bb}">+${fmt(k*bb)}</button>`).join('')}
+      </div>
+      <div class="sub bad hidden" id="warn" style="margin:0 0 6px;text-align:center"></div>
+      <button class="primary" id="ok" style="margin:6px 0 8px">${v>=max?'All-in '+fmt(max):isBet?'Apostar '+fmt(v):'Subir '+fmt(by)+' (a '+fmt(v)+')'}</button>
+      <button class="ghost" style="width:100%" id="cc">Cancelar</button>`;
+    const inp=el.querySelector('#vi');
+    if(keepInput){inp.focus();const L=inp.value.length;try{inp.setSelectionRange(L,L)}catch(e){}}
+    el.querySelector('#m').onclick=()=>{v-=bb;draw(el)};
+    el.querySelector('#pl').onclick=()=>{v+=bb;draw(el)};
+    // escribir a mano: se valida al confirmar, mientras tanto solo se muestra el total
+    inp.oninput=()=>{
+      const x=parseInt(inp.value,10)||0, to=H.cur+x;
+      const w=el.querySelector('#warn'), ok=el.querySelector('#ok');
+      if(to<minTo&&to<max){w.textContent=`La subida mínima es ${fmt(minTo-H.cur)}`;w.classList.remove('hidden');ok.disabled=true}
+      else if(to>max){w.textContent=`No le alcanza: como mucho ${fmt(max-H.cur)} (all-in)`;w.classList.remove('hidden');ok.disabled=true}
+      else{w.classList.add('hidden');ok.disabled=false;v=to;
+        el.querySelector('#tot').innerHTML=`${isBet?'':`Queda en <b style="color:var(--text)">${fmt(v)}</b> · `}pone ${fmt(v-H.bets[p])} de sus fichas${v>=max?' · <b class="gold">all-in</b>':''}`;
+        ok.textContent=v>=max?'All-in '+fmt(max):isBet?'Apostar '+fmt(v):'Subir '+fmt(v-H.cur)+' (a '+fmt(v)+')';}
+    };
+    el.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{v=+b.dataset.v;draw(el)});
+    el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{v+=+b.dataset.add;draw(el)});
+    el.querySelector('#cc').onclick=api.close;
+    el.querySelector('#ok').onclick=()=>{api.close();const to=v;api.mutate(S=>act(S,p,'raise',to))};
+  };
+  api.sheet('',draw);
+}
+
+/* reloj en pantalla */
+setInterval(()=>{
+  const S=U.load('poker_v1');if(!S||!S.started||S.over)return;
+  const tL=document.getElementById('tL'),tG=document.getElementById('tG');
+  if(tL){const ms=(Math.max(1,+S.opts.every||1))*60000-runMs(S,S.level.start,S.level.pauseBase);tL.textContent=ms>0?mmss(ms):'al terminar la mano'}
+  if(tG){const ms=(+S.opts.minutes||120)*60000-runMs(S,S.gameStart,0);tG.textContent=ms>0?mmss(ms):'última mano'}
+},1000);
+U.app(G);
+</script>
+</body>
+</html>
