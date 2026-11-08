@@ -2,7 +2,7 @@
   Service worker: guarda la app en el celular para que funcione sin internet.
   Cada vez que cambies algo (un juego nuevo, un arreglo), subí VERSION en 1.
 */
-const VERSION = 14;
+const VERSION = 15;
 const CACHE = 'anotador-v' + VERSION;
 
 importScripts('games.js');
@@ -14,6 +14,8 @@ const FILES = [
   'common.js',
   'common.css',
   'manifest.webmanifest',
+  'sounds/chancho-letra.mp3',
+  'sounds/chancho-pierde.mp3',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',

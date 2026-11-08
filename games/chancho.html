@@ -59,13 +59,22 @@ function grunt(t0,dur,f0,f1,vol){
   n.buffer=buf;n.connect(nf);nf.connect(ng);ng.connect(a.destination);
   o.start(t0);lfo.start(t0);n.start(t0);o.stop(t0+dur+0.02);lfo.stop(t0+dur+0.02);n.stop(t0+dur+0.02);
 }
-function oink(){if(muted)return;const a=ac();if(!a)return;const t=a.currentTime+0.01;grunt(t,0.16,190,120,0.5);grunt(t+0.2,0.2,210,110,0.55)}
-function squeal(){
-  if(muted)return;const a=ac();if(!a)return;const t=a.currentTime+0.01;
-  grunt(t,0.18,180,120,0.5);grunt(t+0.22,0.18,200,120,0.5);grunt(t+0.44,0.2,220,130,0.55);
-  grunt(t+0.75,1.1,320,900,0.6);   // chillido largo que sube
-  grunt(t+1.9,0.35,260,140,0.5);
+/* sonidos grabados (sounds/); si no cargan, se usa el sintetizado */
+const SND={letra:new Audio('../sounds/chancho-letra.mp3'),pierde:new Audio('../sounds/chancho-pierde.mp3')};
+Object.values(SND).forEach(a=>{a.preload='auto'});
+function play(k,fallback){
+  if(muted)return;
+  try{const a=SND[k];a.currentTime=0;const pr=a.play();if(pr&&pr.catch)pr.catch(()=>fallback())}catch(e){fallback()}
 }
+function oinkSynth(){const a=ac();if(!a)return;const t=a.currentTime+0.01;grunt(t,0.16,190,120,0.5);grunt(t+0.2,0.2,210,110,0.55)}
+function squealSynth(){
+  const a=ac();if(!a)return;const t=a.currentTime+0.01;
+  grunt(t,0.18,180,120,0.5);grunt(t+0.22,0.18,200,120,0.5);grunt(t+0.44,0.2,220,130,0.55);
+  grunt(t+0.75,1.1,320,900,0.6);grunt(t+1.9,0.35,260,140,0.5);
+}
+function oink(){play('letra',oinkSynth)}
+function squeal(){play('pierde',squealSynth)}
+
 const G={
   key:'chancho_v1', title:'Chancho', minP:3, maxP:8,
   whoNote:'en el orden en que están sentados, yendo hacia la derecha',
